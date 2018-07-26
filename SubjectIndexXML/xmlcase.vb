@@ -6,7 +6,7 @@ Imports System.Text
 Imports System.Xml
 
 Public Class xmlcase
-
+    'new comment
     Dim strFileName As String
     Dim xmlFile As XmlDocument = New XmlDocument
 
