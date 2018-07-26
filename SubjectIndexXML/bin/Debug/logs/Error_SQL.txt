@@ -1,0 +1,105 @@
+﻿insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 3 MLRA 387','MLRA_2015_3_387','foreign','Women's Charter (Cap 353','',' 2009 Rev Ed) [Sing] 2009 Rev Ed) [Sing]',' 2009 Rev Ed) [Sing]','Women's Charter (Cap 353, 2009 Rev Ed) [Sing], s 145(1)')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Charter (Cap 353','',' 2009 Rev Ed) [Sing] 2009 Rev Ed) [Sing]',' 2009 Rev Ed)' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 3 MLRA 387','MLRA_2015_3_387','foreign','Women's Charter (Cap 353','','s 145(1)',' 2009 Rev Ed) [Sing]','Women's Charter (Cap 353, 2009 Rev Ed) [Sing], s 145(1)')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Charter (Cap 353','','s 145(1)',' 2009 Rev Ed) [Sing]','Women's Charter (Cap 3' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','Halsbury's Law of England','',' 5th edn 5th edn',' 5th edn','Halsbury's Law of England, 5th edn, vol 22, para 430')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Law of England','',' 5th edn 5th edn',' 5th edn','Halsbury's Law of England, 5' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','Halsbury's Law of England','','vol 22',' 5th edn','Halsbury's Law of England, 5th edn, vol 22, para 430')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Law of England','','vol 22',' 5th edn','Halsbury's Law of England, 5th edn, vo' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','Halsbury's Law of England','','para 430',' 5th edn','Halsbury's Law of England, 5th edn, vol 22, para 430')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Law of England','','para 430',' 5th edn','Halsbury's Law of England, 5th edn, ' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','NS Bindhra's lnterpretation of Statutes','',' 10th edn 10th edn',' 10th edn','NS Bindhra's lnterpretation of Statutes, 10th edn, pp 121-125')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's lnterpretation of Statutes','',' 10th edn 10th edn',' 10th edn','NS Bindhra's ' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','NS Bindhra's lnterpretation of Statutes','','pp 121-125',' 10th edn','NS Bindhra's lnterpretation of Statutes, 10th edn, pp 121-125')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's lnterpretation of Statutes','','pp 121-125',' 10th edn','NS Bindhra's lnterpre' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 3 MLRA 387','MLRA_2015_3_387','foreign','Women's Charter (Cap 353','',' 2009 Rev Ed) [Sing] 2009 Rev Ed) [Sing]',' 2009 Rev Ed) [Sing]','Women's Charter (Cap 353, 2009 Rev Ed) [Sing], s 145(1)')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Charter (Cap 353','',' 2009 Rev Ed) [Sing] 2009 Rev Ed) [Sing]',' 2009 Rev Ed)' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 3 MLRA 387','MLRA_2015_3_387','foreign','Women's Charter (Cap 353','','s 145(1)',' 2009 Rev Ed) [Sing]','Women's Charter (Cap 353, 2009 Rev Ed) [Sing], s 145(1)')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Charter (Cap 353','','s 145(1)',' 2009 Rev Ed) [Sing]','Women's Charter (Cap 3' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','Halsbury's Law of England','',' 5th edn 5th edn',' 5th edn','Halsbury's Law of England, 5th edn, vol 22, para 430')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Law of England','',' 5th edn 5th edn',' 5th edn','Halsbury's Law of England, 5' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','Halsbury's Law of England','','vol 22',' 5th edn','Halsbury's Law of England, 5th edn, vol 22, para 430')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Law of England','','vol 22',' 5th edn','Halsbury's Law of England, 5th edn, vo' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','Halsbury's Law of England','','para 430',' 5th edn','Halsbury's Law of England, 5th edn, vol 22, para 430')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Law of England','','para 430',' 5th edn','Halsbury's Law of England, 5th edn, ' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','NS Bindhra's lnterpretation of Statutes','',' 10th edn 10th edn',' 10th edn','NS Bindhra's lnterpretation of Statutes, 10th edn, pp 121-125')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's lnterpretation of Statutes','',' 10th edn 10th edn',' 10th edn','NS Bindhra's ' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','NS Bindhra's lnterpretation of Statutes','','pp 121-125',' 10th edn','NS Bindhra's lnterpretation of Statutes, 10th edn, pp 121-125')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's lnterpretation of Statutes','','pp 121-125',' 10th edn','NS Bindhra's lnterpre' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 3 MLRA 387','MLRA_2015_3_387','foreign','Women's Charter (Cap 353','',' 2009 Rev Ed) [Sing] 2009 Rev Ed) [Sing]',' 2009 Rev Ed) [Sing]','Women's Charter (Cap 353, 2009 Rev Ed) [Sing], s 145(1)')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Charter (Cap 353','',' 2009 Rev Ed) [Sing] 2009 Rev Ed) [Sing]',' 2009 Rev Ed)' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 3 MLRA 387','MLRA_2015_3_387','foreign','Women's Charter (Cap 353','','s 145(1)',' 2009 Rev Ed) [Sing]','Women's Charter (Cap 353, 2009 Rev Ed) [Sing], s 145(1)')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Charter (Cap 353','','s 145(1)',' 2009 Rev Ed) [Sing]','Women's Charter (Cap 3' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','Halsbury's Law of England','',' 5th edn 5th edn',' 5th edn','Halsbury's Law of England, 5th edn, vol 22, para 430')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Law of England','',' 5th edn 5th edn',' 5th edn','Halsbury's Law of England, 5' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','Halsbury's Law of England','','vol 22',' 5th edn','Halsbury's Law of England, 5th edn, vol 22, para 430')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Law of England','','vol 22',' 5th edn','Halsbury's Law of England, 5th edn, vo' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','Halsbury's Law of England','','para 430',' 5th edn','Halsbury's Law of England, 5th edn, vol 22, para 430')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Law of England','','para 430',' 5th edn','Halsbury's Law of England, 5th edn, ' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','NS Bindhra's lnterpretation of Statutes','',' 10th edn 10th edn',' 10th edn','NS Bindhra's lnterpretation of Statutes, 10th edn, pp 121-125')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's lnterpretation of Statutes','',' 10th edn 10th edn',' 10th edn','NS Bindhra's ' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','NS Bindhra's lnterpretation of Statutes','','pp 121-125',' 10th edn','NS Bindhra's lnterpretation of Statutes, 10th edn, pp 121-125')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's lnterpretation of Statutes','','pp 121-125',' 10th edn','NS Bindhra's lnterpre' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 3 MLRA 387','MLRA_2015_3_387','foreign','Women's Charter (Cap 353','',' 2009 Rev Ed) [Sing] 2009 Rev Ed) [Sing]',' 2009 Rev Ed) [Sing]','Women's Charter (Cap 353, 2009 Rev Ed) [Sing], s 145(1)')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Charter (Cap 353','',' 2009 Rev Ed) [Sing] 2009 Rev Ed) [Sing]',' 2009 Rev Ed)' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 3 MLRA 387','MLRA_2015_3_387','foreign','Women's Charter (Cap 353','','s 145(1)',' 2009 Rev Ed) [Sing]','Women's Charter (Cap 353, 2009 Rev Ed) [Sing], s 145(1)')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Charter (Cap 353','','s 145(1)',' 2009 Rev Ed) [Sing]','Women's Charter (Cap 3' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','Halsbury's Law of England','',' 5th edn 5th edn',' 5th edn','Halsbury's Law of England, 5th edn, vol 22, para 430')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Law of England','',' 5th edn 5th edn',' 5th edn','Halsbury's Law of England, 5' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','Halsbury's Law of England','','vol 22',' 5th edn','Halsbury's Law of England, 5th edn, vol 22, para 430')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Law of England','','vol 22',' 5th edn','Halsbury's Law of England, 5th edn, vo' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','Halsbury's Law of England','','para 430',' 5th edn','Halsbury's Law of England, 5th edn, vol 22, para 430')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Law of England','','para 430',' 5th edn','Halsbury's Law of England, 5th edn, ' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','NS Bindhra's lnterpretation of Statutes','',' 10th edn 10th edn',' 10th edn','NS Bindhra's lnterpretation of Statutes, 10th edn, pp 121-125')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's lnterpretation of Statutes','',' 10th edn 10th edn',' 10th edn','NS Bindhra's ' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','NS Bindhra's lnterpretation of Statutes','','pp 121-125',' 10th edn','NS Bindhra's lnterpretation of Statutes, 10th edn, pp 121-125')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's lnterpretation of Statutes','','pp 121-125',' 10th edn','NS Bindhra's lnterpre' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 3 MLRA 387','MLRA_2015_3_387','foreign','Women\'s Charter (Cap 353','',' 2009 Rev Ed) [Sing] 2009 Rev Ed) [Sing]',' 2009 Rev Ed) [Sing]','Women's Charter (Cap 353, 2009 Rev Ed) [Sing], s 145(1)')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Charter (Cap 353, 2009 Rev Ed) [Sing], s 145(1)')' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 3 MLRA 387','MLRA_2015_3_387','foreign','Women\'s Charter (Cap 353','','s 145(1)',' 2009 Rev Ed) [Sing]','Women's Charter (Cap 353, 2009 Rev Ed) [Sing], s 145(1)')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Charter (Cap 353, 2009 Rev Ed) [Sing], s 145(1)')' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','Halsbury\'s Law of England','',' 5th edn 5th edn',' 5th edn','Halsbury's Law of England, 5th edn, vol 22, para 430')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Law of England, 5th edn, vol 22, para 430')' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','Halsbury\'s Law of England','','vol 22',' 5th edn','Halsbury's Law of England, 5th edn, vol 22, para 430')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Law of England, 5th edn, vol 22, para 430')' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','Halsbury\'s Law of England','','para 430',' 5th edn','Halsbury's Law of England, 5th edn, vol 22, para 430')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's Law of England, 5th edn, vol 22, para 430')' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','NS Bindhra\'s lnterpretation of Statutes','',' 10th edn 10th edn',' 10th edn','NS Bindhra's lnterpretation of Statutes, 10th edn, pp 121-125')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's lnterpretation of Statutes, 10th edn, pp 121-125')' at line 1
+
+insert into ref_legislations (source_citation, source_datafilename, legis_origin, legis_title, legis_filename, legis_sub_no, legis_sub_no_type, legis_link_text) values('[2015] 5 MLRA 377','MLRA_2015_5_377','foreign','NS Bindhra\'s lnterpretation of Statutes','','pp 121-125',' 10th edn','NS Bindhra's lnterpretation of Statutes, 10th edn, pp 121-125')
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 's lnterpretation of Statutes, 10th edn, pp 121-125')' at line 1
+

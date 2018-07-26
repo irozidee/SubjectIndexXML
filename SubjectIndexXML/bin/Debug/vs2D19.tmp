@@ -1,0 +1,28 @@
+﻿<?xml version="1.0"?>
+<doc>
+<assembly>
+<name>
+SubjectIndexXML
+</name>
+</assembly>
+<members>
+<member name="P:SubjectIndexXML.My.Resources.Resources.ResourceManager">
+	<summary>
+  Returns the cached ResourceManager instance used by this class.
+</summary>
+</member><member name="P:SubjectIndexXML.My.Resources.Resources.Culture">
+	<summary>
+  Overrides the current thread's CurrentUICulture property for all
+  resource lookups using this strongly typed resource class.
+</summary>
+</member><member name="T:SubjectIndexXML.My.Resources.Resources">
+	<summary>
+  A strongly-typed resource class, for looking up localized strings, etc.
+</summary>
+</member><member name="M:SubjectIndexXML.frmMain.GetSubjectIndexType(System.String)">
+	<summary>
+ Get the subject index Patter: 1 - With HEADNOTE and CATCHWORDS, 2 - SUBJECT_INDEX with Dash, 3 - SUBJECT_INDEX without Dash, 0 - NosubjectIndex
+ </summary>
+</member>
+</members>
+</doc>

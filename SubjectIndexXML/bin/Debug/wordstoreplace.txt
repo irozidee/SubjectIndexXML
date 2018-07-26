@@ -1,0 +1,17 @@
+Section#s
+section#s
+rr#r
+ss#s
+Orders#O
+Order#O
+Rules#r
+Rule#r
+rules#r
+rule#r
+Articles#art
+Article#art
+subsection#s
+sub-section#s
+subs#s
+sub-s#s
+arts#art

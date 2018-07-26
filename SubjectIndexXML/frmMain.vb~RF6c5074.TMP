@@ -1,0 +1,2411 @@
+﻿Imports System.Net
+Imports System.Xml
+Imports System
+Imports System.Collections.Generic
+Imports System.ComponentModel
+Imports System.Data
+Imports System.Linq
+Imports System.Text
+Imports System.Windows.Forms
+Imports System.Text.RegularExpressions
+Imports iTextSharp.text
+Imports iTextSharp.text.pdf
+Imports System.IO
+Imports Newtonsoft.Json
+Imports System.Xml.Serialization
+
+'Namespace SubjectIndexXML
+
+Imports MySql.Data.MySqlClient
+Public Class frmMain
+
+    Dim subjectIndexCls As dbConnect = New dbConnect()
+    Dim subjectIndex As New List(Of String)
+    Dim subjectIndexContent As New List(Of String)
+    Dim subjectIndexText As New List(Of String)
+    Dim subjectIndexPage As String
+
+   
+    Dim tableContentCases As List(Of String) = New List(Of String)
+    Dim tableContentLegis As List(Of String) = New List(Of String)
+    Dim tableContentSbjIndex As List(Of String) = New List(Of String)
+
+    Dim myCourtList As List(Of String) = New List(Of String)
+    Dim refCasesList As List(Of refCasesC) = New List(Of refCasesC)
+    Dim refLegList As List(Of refLegC) = New List(Of refLegC)
+    Dim subIndexList As List(Of subIndexC) = New List(Of subIndexC)
+    Dim indentRefList As List(Of indentRef) = New List(Of indentRef)
+
+    Dim legislationList As List(Of LegislationListC) = New List(Of LegislationListC)
+    Dim casesList As List(Of CasesListC) = New List(Of CasesListC)
+
+    Dim tableContentCasesJud As List(Of String) = New List(Of String)
+    Dim tableContentLegisJud As List(Of String) = New List(Of String)
+    Dim firstLetterJudCases As List(Of String) = New List(Of String)
+    Dim subjectIndexUploadFolder As String
+    Dim xmlUploadFolder As String
+    Dim legislationUploadFolder
+
+    Private Sub frmMain_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        '==================== lblPath.Text = "C:\\Users/DSSBNB011\\Desktop\\MLRA_2016_5.XML"
+        If File.Exists(tmpPath) = False Then
+            My.Computer.FileSystem.WriteAllText(tmpPath, "", False)
+        Else
+            txtPath.Text = File.ReadAllText(tmpPath)
+        End If
+    End Sub
+
+    Public Function ConvertTitleCase(ByVal strToConvert As String) As String
+        Return StrConv(strToConvert, VbStrConv.ProperCase)
+    End Function
+    Public Function ConvertUpperCase(ByVal strToConvert As String) As String
+        Return StrConv(strToConvert, VbStrConv.Uppercase)
+    End Function
+    Public Function ConvertLowerCase(ByVal strToConvert As String) As String
+        Return StrConv(strToConvert, VbStrConv.Lowercase)
+    End Function
+
+    Private Sub EnableButton(ByVal bool As Boolean)
+        btnCreateXML.Enabled = bool
+        btnUpdate.Enabled = bool
+        btnPath.Enabled = bool
+        btnExtractRefLegislation.Enabled = bool
+        btnExtractSubjectIndex.Enabled = bool
+        btnExtractRefCases.Enabled = bool
+        chkboxdeldata.Enabled = bool
+        chkboxdeldatacases.Enabled = bool
+        chkboxdeldatalegislation.Enabled = bool
+    End Sub
+
+    Private Function DataTable2List(dt As DataTable) As List(Of wordChanger)
+        Dim convertedList As List(Of wordChanger) = (From rw In dt.AsEnumerable() Select New wordChanger() With { _
+        .wordOld = rw(0).ToString(), _
+        .wordNew = rw(1).ToString() _
+    }).ToList()
+        Return convertedList
+    End Function
+
+    Private Shared Function capitalize(mystr As String) As String
+        mystr = System.Threading.Thread.CurrentThread.CurrentCulture.TextInfo.ToTitleCase(mystr.ToLower())
+        Dim citarr As String() = {"Melru", "Mlrhu", "Mlrau", "Melr", "Mlrh", "Mlra", _
+            "Mlrs", "Mlrf"}
+
+        For Each cit As String In citarr
+            mystr = mystr.Replace(cit, cit.ToUpper())
+        Next
+
+        mystr = mystr.Replace(" V.", " v.")
+        mystr = mystr.Replace(" Lwn.", " lwn.")
+        mystr = mystr.Replace("(Refd)", "(refd)")
+        mystr = mystr.Replace("(Dist)", "(dist)")
+        mystr = mystr.Replace("(Foll)", "(refd)")
+        mystr = mystr.Replace("(Not Foll)", "(not foll)")
+        mystr = mystr.Replace("Public Prosecutor", "PP")
+        mystr = mystr.Replace("Pp", "PP")
+
+        For Each word In Globals.wordChangeList
+            Dim pattern As String = "\b" & word.wordOld & "\b"
+            Dim replace As String = word.wordNew
+            mystr = Regex.Replace(mystr, pattern, replace, RegexOptions.IgnoreCase)
+        Next
+        Return mystr
+    End Function
+    Public Sub InfoTextProgress(ByVal strToWrite As String)
+        Me.lstProgress.Items.Add(strToWrite & Environment.NewLine)
+        Me.lstProgress.SelectedIndex = lstProgress.Items.Count - 1
+        If strToWrite.Contains("successfully") Then
+            EnableButton(True)
+        Else
+            EnableButton(False)
+        End If
+    End Sub
+
+    Private Sub btnUpdate_Click(sender As Object, e As EventArgs) Handles btnUpdate.Click
+        '=========== UPDATE REFCASES, REF_LEG_TB, SUBJECTINDEXTB ======================
+        InfoTextProgress("Start API Legislation download")
+        '============================================================================================
+        Using webClient = New System.Net.WebClient()
+            Dim json = webClient.DownloadString(APIURLS.LEGISLATIONDB)
+
+            json = json.Replace("'", "|")
+            json = HELPER.ReplaceString(json, "&amp;", "&", StringComparison.CurrentCultureIgnoreCase)
+            json = HELPER.ReplaceString(json, "&amp", "&", StringComparison.CurrentCultureIgnoreCase)
+            legislationList = JsonConvert.DeserializeObject(Of List(Of LegislationListC))(json)
+
+            If legislationList.Count > 10000 Then
+                subjectIndexCls.Delete("api_legislation")
+            End If
+
+            Dim insSQL As String = "insert into api_legislation(datafilename, title, legislationtype) VALUES "
+            Dim extendSQL As String = String.Empty
+            Dim data As New List(Of String)()
+            Dim counter As Integer = 0
+
+            For Each legislation As LegislationListC In legislationList
+
+                data.Add("('" & legislation.datafilename & "','" & legislation.title & "','" & legislation.legislationtype & "')")
+                counter += 1
+                If counter Mod 1000 = 0 Then
+                    extendSQL = String.Join(",", data.ToArray())
+                    extendSQL = extendSQL.Replace("|", """")
+                    subjectIndexCls.Insert(insSQL & extendSQL)
+                    Application.DoEvents()
+                    InfoTextProgress(counter.ToString() & " LEGISLATION download")
+                    extendSQL = String.Empty
+                    data.Clear()
+                End If
+            Next
+        End Using
+        InfoTextProgress("API Legislation Download Completed")
+
+        '=============================================================================================
+        InfoTextProgress("Start API Cases Download")
+
+        Using webClient = New System.Net.WebClient()
+            Dim json = webClient.DownloadString(APIURLS.CASESDB)
+            json = json.Replace("'", "|")
+            json = HELPER.ReplaceString(json, "&amp;", "&", StringComparison.CurrentCultureIgnoreCase)
+            json = HELPER.ReplaceString(json, "&amp", "&", StringComparison.CurrentCultureIgnoreCase)
+
+            casesList = JsonConvert.DeserializeObject(Of List(Of CasesListC))(json)
+
+            If casesList.Count > 50000 Then
+                subjectIndexCls.Delete("api_cases")
+            End If
+
+            Dim insSQL As String = "INSERT INTO api_cases(datafilename, title, citation) VALUES "
+            Dim extendSQL As String = String.Empty
+            Dim data As New List(Of String)()
+            Dim counter As Integer = 0
+
+            For Each cases As CasesListC In casesList
+
+                data.Add("('" & cases.datafilename & "','" & cases.title & "','" & cases.citation & "')")
+                counter += 1
+                If counter Mod 1000 = 0 Then
+                    extendSQL = String.Join(",", data.ToArray())
+                    extendSQL = extendSQL.Replace("|", """")
+                    subjectIndexCls.Insert(insSQL & extendSQL)
+                    Application.DoEvents()
+                    'btnUpdate.Text = counter.ToString() & " Cases"
+                    InfoTextProgress(counter.ToString() & " CASES download")
+                    extendSQL = String.Empty
+                    data.Clear()
+                End If
+            Next
+        End Using
+        InfoTextProgress("API Cases Download Completed")
+
+        '===============================================================================================
+        'InfoTextProgress("Start Cases Referred Update")
+        'Using webClientLeg = New System.Net.WebClient()
+
+        '    Dim json = webClientLeg.DownloadString(APIURLS.REFCASES)
+        '    json = json.Replace("'", "|")
+        '    json = HELPER.ReplaceString(json, "&amp;", "&", StringComparison.CurrentCultureIgnoreCase)
+        '    json = HELPER.ReplaceString(json, "&amp", "&", StringComparison.CurrentCultureIgnoreCase)
+        '    refCasesList = JsonConvert.DeserializeObject(Of List(Of refCasesC))(json)
+
+        'If refCasesList.Count > 50000 Then
+        '    subjectIndexCls.Delete("refcases")
+        'End If
+
+        '    Dim insSQL As String = "INSERT INTO refcases(rootcitation, ReferredCitation, ReferredTitle, type, referredDatafilename) VALUES "
+        '    Dim extendSQL As String = String.Empty
+        '    Dim data As New List(Of String)
+        '    Dim counter As Integer = 0
+
+        '    For Each REFCASES As refCasesC In refCasesList
+        '        data.Add("('" & REFCASES.rootCitation & "','" & REFCASES.ReferredCitation & "','" & REFCASES.ReferredTitle & "','" & REFCASES.type & "','" & utility.PrintDatafilename(REFCASES.ReferredCitation) & "')")
+        '        counter += 1
+        '        If counter Mod 1000 = 0 Then
+        '            extendSQL = String.Join(",", data.ToArray())
+        '            extendSQL = extendSQL.Replace("|", """")
+        '            subjectIndexCls.Insert(insSQL & extendSQL)
+        '            Application.DoEvents()
+        '            InfoTextProgress(counter.ToString() & " REFERRED_CASES insert")
+        '            extendSQL = String.Empty
+        '            data.Clear()
+        '        End If
+        '    Next
+        'End Using
+        'InfoTextProgress("Cases Referred Update Completed")
+        '' Call subjectIndexCls.UpdateReferredCasesDatafilename()
+        InfoTextProgress("Please wait while tool checking data...")
+        InfoTextProgress("Done. All data successfully updated")
+    End Sub
+    Dim tmpPath As String = "tmpPath.txt"
+    Private Sub btnBrowse_Click(sender As Object, e As EventArgs) Handles btnBrowse.Click
+       
+
+        Call DeleteFilesFromTempFolder()
+
+        If chkboxdeldatacases.Checked Then
+            subjectIndexCls.Delete("xml_cases")
+        End If
+        If fbd.ShowDialog = Windows.Forms.DialogResult.OK Then
+            txtPath.Text = fbd.SelectedPath
+            My.Computer.FileSystem.WriteAllText(tmpPath, fbd.SelectedPath, False)
+            txtPath.Refresh()
+            Call CopyFilesToTempFolder(fbd.SelectedPath) 'method to copy files from original source to temporary folder
+            InfoTextProgress("Start Extracting XML Cases Information")
+            Dim files As String() = Directory.GetFiles(tempPath, "*.xml")
+            Dim datafilename As String = ""
+            Dim judgment_name As String = ""
+            Dim judgment_language As String = ""
+            Dim judge_name As String = ""
+            Dim court_type As String = ""
+            Dim firstLetter As String = ""
+            For Each strfilename As String In files
+                'My.Computer.FileSystem.WriteAllText("txtCases.txt", strfilename + Environment.NewLine, True)
+                lstProgress.Refresh()
+                lblfn.Text = "FileName : " & Path.GetFileNameWithoutExtension(strfilename)
+                Dim myxmlcase As New xmlcase(strfilename)
+                datafilename = Path.GetFileNameWithoutExtension(strfilename)
+                judgment_name = myxmlcase.JUDGMENT_NAME.Replace(Environment.NewLine, " ")
+                judgment_language = myxmlcase.JUDGMENT_LANGUAGE
+                judge_name = myxmlcase.JUDGE_NAME
+                court_type = myxmlcase.COURT_TYPE
+                Try
+                    firstLetter = judgment_name(0)
+                    Dim strSQL As String = "INSERT INTO xml_cases(datafilename, citation, judgment_name, judgment_language, judge_name, court_type, firstletter) " & _
+                        "VALUES ('" & datafilename & "','" & utility.PrintCitation(datafilename) & "','" & utility.CorrectTextFormatSQL(judgment_name) & "','" & judgment_language & "','" & _
+                        utility.CorrectTextFormatSQL(judge_name) & "','" & court_type & "','" & firstLetter & "')"
+                    subjectIndexCls.Insert(strSQL)
+                Catch ex As Exception
+                    MsgBox(strfilename)
+                    Continue For
+                End Try
+                InfoTextProgress("Extract " & datafilename & "... done.")
+            Next
+            InfoTextProgress("Extract Cases Info for " & files.Length.ToString() & " files successfully inserted.")
+        End If
+    End Sub
+    Private Sub btnExtractSubjectIndex_Click(sender As Object, e As EventArgs) Handles btnExtractSubjectIndex.Click
+        My.Computer.FileSystem.WriteAllText("getfilesubjectindex.txt", "", False)
+        If chkboxdeldata.Checked Then
+            subjectIndexCls.Delete("subject_index")
+        End If
+        'Dim result As DialogResult = folderdialogsubjectindex.ShowDialog()
+        'If result = DialogResult.OK Then
+        'Call CopyFilesToTempFolder(folderdialogsubjectindex.SelectedPath) 'method to copy files from original source to temporary folder
+        InfoTextProgress("Start uploading subject index")
+        ' The user selected a folder and pressed the OK button.
+        ' We print the number of files found.
+        '
+        'Dim files As String() = Directory.GetFiles(folderdialogsubjectindex.SelectedPath, "*.xml")
+        Dim files As String() = Directory.GetFiles(tempPath, "*.xml")
+
+        Dim judgname As String = ""
+        Dim judgmentname As String = ""
+        Dim caselanguage As String = ""
+        Dim catchwordNodeList As XmlNodeList
+        Dim subjectIndexNodeList As XmlNodeList
+
+        Dim pageno As String = ""
+        Dim pagc As Integer = 0
+
+        Dim patternSubjectIndex As Integer
+        Dim xmlDoc As New XmlDocument
+        Dim root As XmlNode
+
+        For Each strfilename As String In files
+            patternSubjectIndex = GetSubjectIndexType(strfilename)
+            xmlDoc.Load(strfilename)
+            root = xmlDoc.DocumentElement
+
+            Try
+                Application.DoEvents()
+                lblfn.Text = "FileName : " & Path.GetFileNameWithoutExtension(strfilename)
+
+                Dim myxmlcase As New xmlcase(strfilename)
+                judgmentname = myxmlcase.JUDGMENT_NAME()
+                judgmentname = judgmentname.Trim()
+                caselanguage = myxmlcase.JUDGMENT_LANGUAGE()
+                judgname = myxmlcase.JUDGE_NAME()
+                judgname = judgnameformat(judgname, caselanguage)
+
+                Dim myfilesi As List(Of String) = New List(Of String)
+
+                Dim datafilename As String = Path.GetFileNameWithoutExtension(strfilename)
+
+                Dim strsubjindx As String = ""
+                Dim level1 As String = ""
+                Dim level2 As String = ""
+                Dim strsummary As String = ""
+                Dim strCatchword As String = ""  '=== GetCatchword(strfilename)
+                Dim strLanguage As String = caselanguage
+
+                Dim strToRemove As String = ""
+                Dim lstSubjectIndexNodes As XmlNodeList
+
+                If patternSubjectIndex = 1 Then ' whenever pattern is headnote//catchword/subjectindex is detected
+
+                    catchwordNodeList = myxmlcase.CATCHWORDSWITHP
+                    For Each node As XmlNode In catchwordNodeList
+                        strCatchword = node.InnerText
+                        strsubjindx = strCatchword.Split({" - "}, StringSplitOptions.None)(0)
+                        strToRemove = strsubjindx & " - "
+                        level1 = node.InnerXml.Split({"<SUBJECT_INDEX>", "</SUBJECT_INDEX>"}, StringSplitOptions.None)(1)
+                        level1 = level1.Replace(":", "").Trim
+                        level2 = strCatchword.Split({":", " - "}, StringSplitOptions.None)(1).Trim
+
+                        strsummary = strCatchword.Replace(strToRemove, "")
+                        If strsummary.Contains(": ") Then
+                            strsummary = strCatchword.Replace(strsubjindx, "")
+                        End If
+
+                        Dim sql As String = "INSERT INTO subject_index(source_citation, source_datafilename, subject_index, level1, level2, summary) " & _
+                            "VALUES ('" & utility.PrintCitation(datafilename) & "','" & datafilename & "','" & utility.CorrectTextFormatSQL(strsubjindx.ToUpper) & "','" & _
+                            utility.CorrectTextFormatSQL(level1) & "','" & utility.CorrectTextFormatSQL(level2) & "','" & utility.CorrectTextFormatSQL(strsummary) & "')"
+                        subjectIndexCls.Insert(sql)
+                    Next
+
+                ElseIf patternSubjectIndex = 2 Then ' subject_index tag with dash
+                    subjectIndexNodeList = xmlDoc.SelectNodes(root.Name & "//SUBJECT_INDEX")
+                    For Each node As XmlNode In subjectIndexNodeList
+                        strCatchword = ""
+                        strsummary = ""
+                        strsubjindx = node.InnerText
+
+                        If strsubjindx.Contains(" - ") Then
+                            level1 = strsubjindx.Split({" - "}, StringSplitOptions.None)(0)
+                            level2 = strsubjindx.Split({" - "}, StringSplitOptions.None)(1)
+                        Else
+                            level1 = strsubjindx
+                            level2 = ""
+                        End If
+                        Dim sql As String = "INSERT INTO subject_index(source_citation, source_datafilename, subject_index, level1, level2, summary) " & _
+                            "VALUES ('" & utility.PrintCitation(datafilename) & "','" & datafilename & "','" & utility.CorrectTextFormatSQL(strsubjindx.ToUpper) & "','" & _
+                            utility.CorrectTextFormatSQL(level1) & "','" & utility.CorrectTextFormatSQL(level2) & "','" & utility.CorrectTextFormatSQL(strsummary) & "')"
+                        subjectIndexCls.Insert(sql)
+                    Next
+                Else
+                    ' NO SUBJECT INDEX
+                End If
+                InfoTextProgress(" - " & Path.GetFileNameWithoutExtension(strfilename) & "...done")
+
+            Catch ex As Exception
+                InfoTextProgress(" - " & Path.GetFileNameWithoutExtension(strfilename) & "...Error / Wrong format")
+                My.Computer.FileSystem.WriteAllText("errorXML.txt", Path.GetFileNameWithoutExtension(strfilename) & ", Problem : " & ex.Message.ToString, True)
+                Continue For
+
+            End Try
+        Next
+        ''===''====MessageBox.Show("SUBJECT INDEX : " & files.Length.ToString() & " files successfully uploaded into subject index table.")
+        InfoTextProgress("Subject index data for " & files.Length.ToString() & " files successfully inserted.")
+        ' End If
+    End Sub
+
+    Public Function doReplace(originalString As String, oldValue As String, newValue As String, comparisonType As StringComparison) As String
+        Dim startIndex As Integer = 0
+        While True
+            startIndex = originalString.IndexOf(oldValue, startIndex, comparisonType)
+            If startIndex = -1 Then
+                Exit While
+            End If
+            originalString = (originalString.Substring(0, startIndex) & newValue) + originalString.Substring(startIndex + oldValue.Length)
+            startIndex += newValue.Length
+        End While
+        Return originalString
+    End Function
+    Public Function judgnameformat(strjdjname As String, lang As String) As String
+        Dim judgrankEng As String() = {"CJ", "PCA", "CJM", "CJSS", "FCJ", "FCJJ", _
+            "JCA", "JJCA", "J", "JC"}
+        Dim judgrankMal As String() = {"KHN", "PMR", "HBM", "HBSS", "HMP", "HHMP", _
+            "HMR", "HHMR", "H", "PK"}
+
+        If lang.ToUpper() = "ENGLISH" Then
+            For Each word As String In judgrankEng
+                strjdjname = doReplace(strjdjname, (Convert.ToString(" ") & word) & " ", " " & word.ToUpper() & " ", StringComparison.CurrentCultureIgnoreCase)
+                strjdjname = doReplace(strjdjname, (Convert.ToString(" ") & word) & ",", " " & word.ToUpper() & ",", StringComparison.CurrentCultureIgnoreCase)
+                strjdjname = doReplace(strjdjname, (Convert.ToString(" ") & word) & ")", " " & word.ToUpper() & ")", StringComparison.CurrentCultureIgnoreCase)
+            Next
+        Else
+
+            For Each word As String In judgrankMal
+                strjdjname = doReplace(strjdjname, (Convert.ToString(" ") & word) & " ", " " & word.ToUpper() & " ", StringComparison.CurrentCultureIgnoreCase)
+                strjdjname = doReplace(strjdjname, (Convert.ToString(" ") & word) & ",", " " & word.ToUpper() & ",", StringComparison.CurrentCultureIgnoreCase)
+                strjdjname = doReplace(strjdjname, (Convert.ToString(" ") & word) & ")", " " & word.ToUpper() & ")", StringComparison.CurrentCultureIgnoreCase)
+            Next
+        End If
+
+        strjdjname = doReplace(strjdjname, " V.", " v.", StringComparison.CurrentCultureIgnoreCase)
+        strjdjname = doReplace(strjdjname, " V ", " v ", StringComparison.CurrentCultureIgnoreCase)
+
+        strjdjname = doReplace(strjdjname, " lwn.", " lwn.", StringComparison.CurrentCultureIgnoreCase)
+        strjdjname = doReplace(strjdjname, " lwn ", " lwn ", StringComparison.CurrentCultureIgnoreCase)
+
+        Return strjdjname
+    End Function
+
+    Private Function FormatCit(cit As String, citationtype As Integer) As String
+        Dim returns As String = ""
+        cit = Regex.Replace(cit, "\s+", " ")
+        cit = cit.Replace(Environment.NewLine, "").ToUpper().Trim()
+
+        If citationtype = 1 Then
+            Dim s As String() = cit.Split(New String() {" "}, StringSplitOptions.None)
+            If s.Count() = 4 Then
+                returns = s(2).ToString() & "_" & s(0).ToString().Replace("[", "").Replace("]", "") & "_" & s(1).ToString() & "_" & s(3).ToString()
+            ElseIf s.Count() = 3 Then
+                returns = s(1).ToString() & "_" & s(0).ToString().Replace("[", "").Replace("]", "") & "_" & s(2).ToString()
+            Else
+                returns = "Error"
+            End If
+
+        Else
+            Dim s As String() = cit.Split(New String() {"_"}, StringSplitOptions.None)
+            If s.Count() = 4 Then
+                returns = "[" & s(1).ToString() & "] " & s(2).ToString() & " " & s(0).ToString() & " " & s(3).ToString()
+            ElseIf s.Count() = 3 Then
+                returns = "[" & s(1).ToString() & "] " & s(0).ToString() & " " & s(2).ToString()
+            Else
+                returns = "Error"
+            End If
+        End If
+
+        Return returns
+
+    End Function
+
+    Private Function GetCatchword(ByVal fileName As String) As String
+        Dim xmlDoc As New XmlDocument
+        xmlDoc.Load(fileName)
+        Dim root As String = xmlDoc.DocumentElement.Name
+        Dim catchwordsNode As XmlNode
+        Dim returnValue As String = ""
+        'Try
+        '    catchword = xmlDoc.DocumentElement.SelectSingleNode("HEADNOTE//CATCHWORDS")
+        '    returnValue = Regex.Replace(catchword.InnerXml, "<.*?>", "").Replace("<br><i>", " ").Replace("'", "")
+        '    Return returnValue
+        'Catch ex As Exception
+        '    Return ""
+        'End Try
+
+        Dim strCatchword As String = ""
+        Try
+            catchwordsNode = xmlDoc.SelectSingleNode(root & "/HEADNOTE/CATCHWORDS")
+            For Each subjectIndexNode As XmlNode In catchwordsNode
+                strCatchword = subjectIndexNode.InnerText.ToString.Replace(":", " - ")
+            Next
+
+        Catch ex As Exception
+            Dim nodeList As XmlNodeList = xmlDoc.SelectNodes(root & "/HEADNOTE/SUBJECT_INDEX")
+            For Each node As XmlNode In nodeList
+                strCatchword = node.InnerText
+            Next
+
+        Finally
+            Dim nodeList As XmlNodeList = xmlDoc.SelectNodes(root & "/SUBJECT_INDEX")
+            For Each node As XmlNode In nodeList
+                strCatchword = node.InnerText
+            Next
+        End Try
+
+        Return strCatchword
+    End Function
+    Private Function GenerateNewXMLName(ByVal LoadedFolder As String) As String
+        If Directory.Exists(LoadedFolder) Then
+            Dim newName As String
+            Try
+                Dim arrFile = LoadedFolder.Split("\")
+                newName = arrFile(arrFile.Count - 1)
+                Return newName
+            Catch ex As Exception
+                Return ""
+            End Try
+        End If
+    End Function
+
+    Private Function SubjectIndexSummary(ByVal xmlfile As StreamReader, ByVal startWords As String) As String
+        Try
+            Dim xmlDoc As New XmlDocument
+            xmlDoc.Load(xmlfile)
+            Dim node As XmlNode = xmlDoc.SelectSingleNode("CATCHWORDS//p")
+            For Each strPara As String In node.InnerXml.ToString
+                If strPara.StartsWith(startWords) = True Then
+                    Return strPara
+                Else
+                    Return "NOT FOUND"
+                End If
+            Next
+        Catch ex As Exception
+            MsgBox(ex.Message)
+        End Try
+
+    End Function
+    Private Function GetSubjectIndexLevelData(ByVal strSubjectIndex As String, ByVal index As Integer) As String
+        Dim result As String = strSubjectIndex
+        Try
+            result = Trim(strSubjectIndex.Split({" - "}, StringSplitOptions.None)(index))
+        Catch ex As Exception
+            result = strSubjectIndex
+        End Try
+        Return result
+    End Function
+    ''' <summary>
+    ''' Get the subject index Patter: 1 - With HEADNOTE and CATCHWORDS, 2 - SUBJECT_INDEX with Dash, 3 - SUBJECT_INDEX without Dash, 0 - NosubjectIndex
+    ''' </summary>
+    Private Function GetSubjectIndexType(ByVal xmlFilePath As String) As Integer
+        Dim resultPattern As Integer
+        Dim xmlDoc As New XmlDocument
+        xmlDoc.Load(xmlFilePath)
+        Dim root As XmlNode = xmlDoc.DocumentElement
+        Dim node As XmlNode
+        Try
+            node = xmlDoc.SelectSingleNode(root.Name & "//" & "HEADNOTE//CATCHWORDS//SUBJECT_INDEX")
+            If IsNothing(node) Then
+                node = xmlDoc.SelectSingleNode(root.Name & "//" & "SUBJECT_INDEX")
+
+                'If node.InnerText.Contains(" - ") Then
+                '    resultPattern = 2
+                'Else
+                '    resultPattern = 3
+                'End If
+
+                resultPattern = 2
+            Else
+                resultPattern = 1
+            End If
+        Catch ex As Exception
+            resultPattern = 0
+        End Try
+        Return resultPattern
+    End Function
+
+    Private Function RemoveQuote(ByVal str As String) As String
+        Dim result As String
+        result = str.Replace("""", "'")
+        result = str.Replace("'", "''")
+        result = str.Replace("()", "")
+        Return result
+    End Function
+
+    Public tempPath As String = "temp"
+    Private Sub CopyFilesToTempFolder(ByVal selectedPath As String)
+        If Directory.Exists(tempPath) Then
+        Else
+            Directory.CreateDirectory(tempPath)
+        End If
+        For Each filePath As String In Directory.GetFiles(fbd.SelectedPath)
+            My.Computer.FileSystem.CopyFile(filePath, tempPath & "\" & Path.GetFileName(filePath), True)
+        Next
+    End Sub
+    Private Sub DeleteFilesFromTempFolder()
+        Try
+            My.Computer.FileSystem.DeleteDirectory(tempPath, FileIO.DeleteDirectoryOption.DeleteAllContents)
+        Catch ex As Exception
+        End Try
+    End Sub
+
+    Private Sub btnExtractCases_Click(sender As Object, e As EventArgs)
+
+        Call DeleteFilesFromTempFolder()
+        lstProgress.Refresh()
+        If chkboxdeldatacases.Checked Then
+            subjectIndexCls.Delete("xml_cases")
+        End If
+
+        Dim result As DialogResult = folderdialogsubjectindex.ShowDialog()
+        If result = DialogResult.OK Then
+            Call CopyFilesToTempFolder(folderdialogsubjectindex.SelectedPath) 'method to copy files from original source to temporary folder
+
+            InfoTextProgress("Start Extracting XML Cases Information")
+            Dim files As String() = Directory.GetFiles(tempPath, "*.xml")
+            Dim datafilename As String = ""
+            Dim judgment_name As String = ""
+            Dim judgment_language As String = ""
+            Dim judge_name As String = ""
+            Dim court_type As String = ""
+            Dim firstLetter As String = ""
+            For Each strfilename As String In files
+                'My.Computer.FileSystem.WriteAllText("txtCases.txt", strfilename + Environment.NewLine, True)
+
+                lblfn.Text = "FileName : " & Path.GetFileNameWithoutExtension(strfilename)
+                Dim myxmlcase As New xmlcase(strfilename)
+                datafilename = Path.GetFileNameWithoutExtension(strfilename)
+                judgment_name = myxmlcase.JUDGMENT_NAME.Replace(Environment.NewLine, " ")
+                judgment_language = myxmlcase.JUDGMENT_LANGUAGE
+                judge_name = myxmlcase.JUDGE_NAME
+                court_type = myxmlcase.COURT_TYPE
+
+                Try
+                    firstLetter = judgment_name(0)
+                    Dim strSQL As String = "INSERT INTO xml_cases(datafilename, citation, judgment_name, judgment_language, judge_name, court_type, firstletter) " & _
+                        "VALUES ('" & datafilename & "','" & utility.PrintCitation(datafilename) & "','" & utility.CorrectTextFormatSQL(judgment_name) & "','" & judgment_language & "','" & _
+                        utility.CorrectTextFormatSQL(judge_name) & "','" & court_type & "','" & firstLetter & "')"
+                    subjectIndexCls.Insert(strSQL)
+                Catch ex As Exception
+                    MsgBox(strfilename)
+                    Continue For
+                End Try
+                InfoTextProgress("Extract " & datafilename & "... done.")
+            Next
+            InfoTextProgress("Extract Cases Info for " & files.Length.ToString() & " files successfully inserted.")
+        End If
+    End Sub
+
+    Private Function GetLegislation(ByVal xmlFilename As String)
+        Dim xmlreader As XmlReader
+        Dim setting As XmlReaderSettings
+
+        Dim xmldocument As New XmlDocument
+        If My.Computer.FileSystem.FileExists(xmlFilename) Then
+            xmldocument.Load(xmlFilename)
+        End If
+    End Function
+    Private Function ReplaceProperWords(ByVal strReturn As String) As String
+        strReturn = strReturn.Replace(" Pp ", " PP ").Replace("Pp ", "PP ").Replace(" Pp", " PP").Replace(" V. ", " v. ").Replace("V. ", "v. ").Replace("Pp[", "PP[") _
+        .Replace("Lwn. ", "lwn. ").Replace("(Refd)", "(refd)").Replace("(Foll)", "(foll)").Replace(" Ii ", " II ").Replace(" Iii ", " III ") _
+        .Replace("Mlra", "MLRA").Replace("Mlrh", "MLRH").Replace("Melr", "MELR").Replace("Jjca", "JJCA").Replace("Jca", "JCA").Replace("Jhc", "JHC") _
+        .Replace("Jjhc", "JJHC").Replace("Mlrau", "MLRAU").Replace("Mlrhu", "MLRHU").Replace("Melru", "MELRU").Replace("Public Prosecutor", "PP").Replace("MLRAu", "MLRAU").Replace("MLRHu", "MLRHU").Replace("MELRu", "MELRU") _
+        .Replace("Bsn ", "BSN").Replace(" V ", " v. ").Replace(" Yb ", " YB ").Replace("''", "' ").Replace("()", "").Replace("((", "(").Replace("))", ")").Replace("amp;amp;", "amp;") _
+        .Replace("&lt;P&gt;", "").Replace("&lt;/P&gt;", "").Replace("&lt;B&gt;", "").Replace("&lt;/B&gt;", "").Replace("&lt;I&gt;", "").Replace("&lt;/I&gt;", "") _
+        .Replace("<P>", "").Replace("</P>", "").Replace("<B>", "").Replace("</B>", "").Replace("<I>", "").Replace("</I>", "") _
+        .Replace("&amp;amp;", "&amp;").Replace("()", "")
+        Return strReturn
+    End Function
+
+    Private Function TagAndValue(ByVal Tag As String, ByVal Value As String)
+        Dim returnValue As String = Nothing
+        returnValue = "<" & Tag & ">" & Value & "</" & Tag & ">" & Environment.NewLine
+        Return returnValue
+    End Function
+    Private Sub XMLWriter(ByVal w As XmlWriter, ByVal tag1 As String, ByVal tag2 As String)
+        Dim strToWrite As String = Nothing
+        Dim writer As XmlWriter()
+        Dim xmlDocument As New XmlDocument
+    End Sub
+
+    Dim strDocument As String = ""
+    Dim strCourt As String = ""
+    Dim strYear As String = ""
+    Dim strVolume As String = ""
+    Dim strPart As String = ""
+    Dim strCitation As String = ""
+
+    Private Function GetTitleForXML(ByVal fileName As String) As String
+        strCitation = UCase(fileName).Replace(".XML", "")
+        Try
+            strCourt = strCitation.Split("_")(0)
+            strYear = strCitation.Split("_")(1)
+            strVolume = strCitation.Split("_")(2)
+        Catch ex As Exception
+            Return strDocument
+        End Try
+    End Function
+    Private Function GetCourtName(ByVal str As String) As String
+        Select Case UCase(str)
+            Case Is = "MLRA"
+                Return "COURT OF APPEAL"
+            Case Is = "MLRH"
+                Return "HIGH COURT"
+            Case Is = "MELR"
+                Return "INDUSTRIAL COURT"
+            Case Is = "MLRS"
+                Return "SESSION COURT"
+            Case Else
+                Return ""
+        End Select
+    End Function
+    Private Function RemoveBackSlash(ByVal str As String) As String
+        Return str.Replace("\\", "\").Replace("\", " ").Replace("\%", " ").Replace("\ %", " ").Replace(Environment.NewLine, "").Replace("%", " ").Replace("<br />", "").Replace(Environment.NewLine, "").Replace("<br/>", " ") _
+        .Replace("       ", " ") _
+        .Replace("      ", " ") _
+        .Replace("     ", " ") _
+        .Replace("    ", " ") _
+        .Replace("   ", " ") _
+        .Replace("  ", " ")
+        '.Replace("amp;amp;", "amp;")
+    End Function
+    Private Sub btnCreateXML_Click(sender As Object, e As EventArgs) Handles btnCreateXML.Click
+        If lblPath.Text = "NOT SET" Then
+            MsgBox("Please set your save location for subject index xml.", vbExclamation, "Error save location")
+            Exit Sub
+        Else
+            InfoTextProgress("START CREATING XML...")
+            'Try
+            '    Globals.wordChangeList.Clear()
+            'Catch ex As Exception
+            'End Try
+            '=================================================
+            'Dim ds As DataSet = New DataSet
+            'Dim dt As New DataTable(0)
+            'ds.ReadXml("words.xml")
+            'Globals.wordChangeList = DataTable2List(dt)
+            Try
+                subjectIndex = subjectIndexCls.Selects()
+                subjectIndexContent = subjectIndexCls.Selectsubjectindexcontent()
+                tableContentLegis = subjectIndexCls.Selecttablecontentslegis()
+                Call WriteXMLCode()
+            Catch ex As Exception
+                MsgBox(ex.Message)
+            End Try
+
+        End If
+    End Sub
+
+    Private Sub WriteXMLCode()
+        Dim xmlFileName As String
+        xmlFileName = UCase(lblPath.Text)
+
+        Dim writer As New XmlTextWriter(xmlFileName, Encoding.UTF8)
+        writer.WriteStartDocument(True)
+        writer.WriteStartElement("ROOT")
+        writer.WriteString(Environment.NewLine)
+        writer.WriteStartElement("DOCUMENT_INFO")
+        writer.WriteString(Environment.NewLine)
+        writer.WriteStartElement("COMPANY")
+
+        writer.WriteString("Malaysian Law Review")
+        writer.WriteEndElement()
+        writer.WriteString(Environment.NewLine)
+        Dim arrFile() As String
+
+        Try
+            writer.WriteStartElement("TITLE")
+            arrFile = xmlFileName.Split("\")
+            Dim citation As String = arrFile(arrFile.Count - 1).Replace(".XML", "")
+            writer.WriteString(citation)
+            writer.WriteEndElement()
+            writer.WriteString(Environment.NewLine)
+            Dim subCitation() As String = citation.Split("_")
+
+            writer.WriteStartElement("COURT")
+            writer.WriteString(GetCourtName(subCitation(0)))
+            writer.WriteEndElement()
+
+            writer.WriteString(Environment.NewLine)
+            writer.WriteStartElement("YEAR")
+            writer.WriteString(subCitation(1))
+            writer.WriteEndElement()
+
+            writer.WriteString(Environment.NewLine)
+            writer.WriteStartElement("VOLUME")
+            writer.WriteString(subCitation(2))
+            writer.WriteEndElement()
+
+            writer.WriteString(Environment.NewLine)
+            writer.WriteStartElement("PART")
+            writer.WriteString(" ")
+            writer.WriteEndElement()
+            writer.WriteString(Environment.NewLine)
+
+        Catch ex As Exception
+        End Try
+        writer.WriteEndElement()
+        writer.WriteString(Environment.NewLine)
+        InfoTextProgress("Writing Document Info value... done")
+        writer.WriteStartElement("LIST_OF_CONTENT")
+        writer.WriteString(Environment.NewLine)
+
+        '=======================================================================TABLE OF CONTENT
+        writer.WriteStartElement("TABLE_OF_CONTENT") ' =================>>> AAAAAAA
+        writer.WriteString(Environment.NewLine)
+        '====================================================================
+        writer.WriteStartElement("p")
+        writer.WriteStartElement("SECTION_TITLE")
+        writer.WriteString("TABLE OF CONTENT")
+        writer.WriteString(Environment.NewLine)
+        writer.WriteString(Environment.NewLine)
+        writer.WriteEndElement()
+        writer.WriteEndElement()
+
+        writer.WriteString(Environment.NewLine)
+        writer.WriteStartElement("p")
+        writer.WriteStartElement("ABOLD")
+        writer.WriteString("Table of Cases")
+        writer.WriteEndElement()
+
+        writer.WriteString(Microsoft.VisualBasic.vbTab & "1")
+
+        writer.WriteEndElement()
+        writer.WriteString(Environment.NewLine)
+        writer.WriteString(Environment.NewLine)
+
+        writer.WriteStartElement("p")
+        writer.WriteStartElement("ABOLD")
+        writer.WriteString("Table of Cases Judicially Considered")
+        writer.WriteEndElement()
+        writer.WriteEndElement()
+        writer.WriteString(Environment.NewLine)
+        writer.WriteString(Environment.NewLine)
+
+        writer.WriteStartElement("p")
+        writer.WriteStartElement("ABOLD")
+        writer.WriteString("Table of Legislation  Judicially Considered")
+        writer.WriteEndElement()
+        writer.WriteEndElement()
+        writer.WriteString(Environment.NewLine)
+        writer.WriteString(Environment.NewLine)
+
+        writer.WriteStartElement("p")
+        writer.WriteStartElement("ABOLD")
+        writer.WriteString("Subject Index")
+        writer.WriteEndElement()
+        writer.WriteEndElement()
+        writer.WriteString(Environment.NewLine)
+        writer.WriteString(Environment.NewLine)
+
+        Dim strLanguage As String = "english"
+        Try
+            subjectIndexText = subjectIndexCls.SelectsubjectindexText(strLanguage)
+            For i As Integer = 0 To subjectIndexText.Count - 1
+
+                Dim subIndex As String = subjectIndexText(i).ToString
+                writer.WriteStartElement("p")
+                writer.WriteStartElement("ANORMAL")
+
+
+                writer.WriteString(StrConv(subIndex, VbStrConv.ProperCase))
+                subjectIndexPage = subjectIndexCls.SelectsubjectindexPage(subIndex, strLanguage)
+                'writer.WriteString(Microsoft.VisualBasic.vbTab) ' & pageNo)
+
+                'Next
+                writer.WriteEndElement()
+                writer.WriteEndElement()
+                writer.WriteString(Environment.NewLine)
+                writer.WriteString(Environment.NewLine)
+            Next i
+            strLanguage = "malaysian"
+            subjectIndexText = subjectIndexCls.SelectsubjectindexText(strLanguage)
+
+            For i As Integer = 0 To subjectIndexText.Count - 1
+                Dim subIndex As String = subjectIndexText(i).ToString
+                writer.WriteStartElement("p")
+                writer.WriteStartElement("ANORMAL")
+                writer.WriteString(StrConv(subIndex, VbStrConv.ProperCase))
+                subjectIndexPage = subjectIndexCls.SelectSubjectIndexPage(subIndex, strLanguage)
+                'writer.WriteString(Microsoft.VisualBasic.vbTab) ' & pageNo)
+
+                'Next
+                writer.WriteEndElement()
+                writer.WriteEndElement()
+                writer.WriteString(Environment.NewLine)
+                writer.WriteString(Environment.NewLine)
+            Next i
+
+        Catch ex As Exception
+        End Try
+
+        ' writer.WriteEndElement() ' closing table
+        writer.WriteEndElement() ' end of list_of_Content
+        writer.WriteEndElement() ' end of table_of_content
+        writer.WriteString(Environment.NewLine)
+        writer.WriteString(Environment.NewLine)
+        InfoTextProgress("Writing Table Of Content... done")
+        '===========================================================TABLE CONTENT OF CASES============================================================
+        writer.WriteStartElement("CONTENT")
+
+        writer.WriteStartElement("TABLE_OF_CASES") '==========================>>>> BBBBBBB
+        writer.WriteString(Environment.NewLine)
+        writer.WriteStartElement("p")
+        writer.WriteStartElement("SECTION_TITLE")
+        writer.WriteString("TABLE OF CASES")
+        writer.WriteEndElement()
+        writer.WriteEndElement()
+        writer.WriteString(Environment.NewLine)
+        writer.WriteString(Environment.NewLine)
+
+        writer.WriteStartElement("p")
+        writer.WriteStartElement("BNORMAL")
+        writer.WriteString("The mode of citation of cases reported in this volume of the Malaysian Law Review ")
+        writer.WriteEndElement()
+        writer.WriteEndElement()
+        writer.WriteString(Environment.NewLine)
+        writer.WriteString(Environment.NewLine)
+        myCourtList = subjectIndexCls.courtlist()
+
+        For Each strCourt As String In myCourtList
+            tableContentCases = subjectIndexCls.Selectmaincases(strCourt)
+            writer.WriteStartElement("p")
+            writer.WriteStartElement("BBOLD")
+            writer.WriteString(strCourt.ToUpper)
+            writer.WriteString(Microsoft.VisualBasic.vbTab & "PAGE")
+            writer.WriteEndElement()
+            writer.WriteEndElement()
+            writer.WriteString(Environment.NewLine)
+            writer.WriteString(Environment.NewLine)
+            For i As Integer = 0 To tableContentCases.Count - 1
+                writer.WriteStartElement("p")
+                writer.WriteStartElement("BNORMAL")
+                writer.WriteString(ReplaceProperWords(StrConv(tableContentCases(i).Replace(vbTab, " "), VbStrConv.ProperCase)))
+                writer.WriteEndElement()
+                writer.WriteEndElement()
+                writer.WriteString(Environment.NewLine)
+                writer.WriteString(Environment.NewLine)
+            Next
+        Next
+        ''''====== writer.WriteEndElement() ' closing table
+        writer.WriteEndElement() ' end of table_of_cases
+        writer.WriteString(Environment.NewLine)
+        InfoTextProgress("Writing Table Of Cases... done")
+        '===========================================================TABLE CONTENT OF CASES JUDICIALLY CONSIDERED===========================================
+
+
+        writer.WriteStartElement("TABLE_OF_CASES_JUDICIALLY_CONSIDERED") '=============>>>>>> CCCCCCCCCCC
+        writer.WriteString(Environment.NewLine)
+        writer.WriteString(Environment.NewLine)
+
+        writer.WriteStartElement("p")
+        writer.WriteStartElement("SECTION_TITLE")
+        writer.WriteString("TABLE OF CASES JUDICIALLY CONSIDERED")
+        writer.WriteEndElement()
+        writer.WriteEndElement()
+        writer.WriteString(Environment.NewLine)
+        writer.WriteString(Environment.NewLine)
+
+        myCourtList = subjectIndexCls.courtlist()
+        firstLetterJudCases = subjectIndexCls.CasesJudicial_FirstLetter
+
+        Dim SubjectIndexJudCases As List(Of String) = New List(Of String)
+        Dim TitleJudCases As List(Of String) = New List(Of String)
+
+        For Each fl As String In firstLetterJudCases
+            writer.WriteStartElement("p")
+            writer.WriteStartElement("CBOLD")
+            writer.WriteString(fl)
+            writer.WriteEndElement()
+            writer.WriteEndElement()
+            writer.WriteString(Environment.NewLine)
+            writer.WriteString(Environment.NewLine)
+            SubjectIndexJudCases = subjectIndexCls.CasesJudicial_Title(fl)
+
+            For Each strSubjectIndexJudCases As String In SubjectIndexJudCases.Distinct
+                Dim referredTitle As String
+                Dim line1 As String
+                Try
+                    referredTitle = strSubjectIndexJudCases.Split({"#"}, StringSplitOptions.None)(0)
+                    line1 = ReplaceProperWords(strSubjectIndexJudCases.Replace("#", " "))
+                Catch ex As Exception
+                    Continue For
+                End Try
+
+                writer.WriteStartElement("p")
+                writer.WriteStartElement("CBOLD")
+                writer.WriteString(RemoveBackSlash(line1.Replace("''", "'")))
+                writer.WriteEndElement()
+                writer.WriteEndElement()
+                writer.WriteString(Environment.NewLine)
+
+                TitleJudCases = subjectIndexCls.CasesJudicial_JudgeName(fl, referredTitle)
+                Dim line2 As String = ""
+                Try
+                    For Each strTitle As String In TitleJudCases
+                        line2 = RemoveBackSlash(strTitle)
+                        writer.WriteStartElement("p2")
+                        writer.WriteStartElement("CITALIC")
+                        writer.WriteString(ReplaceProperWords(RemoveBackSlash(line2)))
+                        writer.WriteEndElement()
+                        writer.WriteEndElement()
+                        writer.WriteString(Environment.NewLine)
+                    Next
+                Catch ex As Exception
+                    'MsgBox(fl & " " & referredTitle)
+                    Continue For
+                End Try
+
+                writer.WriteString(Environment.NewLine)
+            Next
+        Next
+
+        writer.WriteEndElement() ' end of table_of_cases
+        writer.WriteString(Environment.NewLine)
+        InfoTextProgress("Writing Table Of Cases Judicially Considered... done")
+        '=======================================================TABLE OF LEGISLATIONS JUDICIALLY CONSIDERED=========================================
+        writer.WriteStartElement("TABLE_OF_LEGISLATIONS_JUDICIALLY_CONSIDERED") '=======>>>DDDDD
+        writer.WriteString(Environment.NewLine)
+        writer.WriteStartElement("p")
+        writer.WriteStartElement("SECTION_TITLE")
+        writer.WriteString("TABLE OF LEGISLATIONS JUDICIALLY CONSIDERED")
+        writer.WriteEndElement()
+        writer.WriteEndElement()
+        writer.WriteString(Environment.NewLine)
+        writer.WriteString(Environment.NewLine)
+        tableContentLegisJud = subjectIndexCls.SelectTableLegisJudTitle
+        For Each strLegislation As String In tableContentLegisJud
+            writer.WriteStartElement("DBOLD")
+            Dim newLegislation As String = ReplaceProperWords(StrConv(strLegislation, VbStrConv.ProperCase))
+            If newLegislation.EndsWith(",") Or newLegislation.EndsWith(", ") Then
+                newLegislation = Trim(newLegislation).Remove(newLegislation.Length - 1, 1)
+            End If
+
+            writer.WriteString(newLegislation)
+            writer.WriteEndElement() ' end dbold
+            writer.WriteString(Environment.NewLine)
+            writer.WriteString(Environment.NewLine)
+
+            Dim section As List(Of String) = subjectIndexCls.SelectTableLegisJudSection(strLegislation)
+            For Each strSection As String In section.Distinct
+                Dim sSection As String = Trim(strSection)
+                If sSection.Length = 0 Then
+                    sSection = ""
+                Else
+
+                End If
+
+                Dim strPage As Integer = 0
+
+                writer.WriteStartElement("DNORMAL")
+                writer.WriteString(sSection)
+
+                Dim strPageNo As String = ""
+                strPageNo = subjectIndexCls.LegislationSectionPageList(strLegislation, strSection)
+                writer.WriteString("     " & strPageNo)
+                writer.WriteEndElement() ' end dnormal
+
+                writer.WriteString(Environment.NewLine)
+                writer.WriteString(Environment.NewLine)
+            Next strSection
+        Next
+
+        '====writer.WriteEndElement() ' closing table
+
+        writer.WriteEndElement() ' end of table_of_cases
+        writer.WriteString(Environment.NewLine)
+        InfoTextProgress("Writing Table Of Legislations Judicially Considered... done")
+        '=======================================================SUBJECT INDEX================================================================================
+        writer.WriteStartElement("SUBJECT_INDEX") '============>>>>>>>E
+        writer.WriteString(Environment.NewLine)
+        writer.WriteStartElement("p")
+        writer.WriteStartElement("SECTION_TITLE")
+        writer.WriteString("SUBJECT INDEX")
+        writer.WriteEndElement()
+        writer.WriteEndElement()
+        writer.WriteString(Environment.NewLine)
+        writer.WriteString(Environment.NewLine)
+
+        Try
+            'ENGLISH LANGUAGE'
+            Dim si_Language = "english"
+
+            Dim Level1 As List(Of String) = subjectIndexCls.SelectSubjectIndexLevel1(si_Language)
+            For Each strLevel1 As String In Level1
+
+                'writer.WriteString("======================================================================================")
+                'writer.WriteString(Environment.NewLine)
+                writer.WriteStartElement("p")
+                writer.WriteStartElement("EBOLD")
+                writer.WriteString(UCase(strLevel1))
+                writer.WriteEndElement()
+                writer.WriteEndElement()
+                'writer.WriteString(Environment.NewLine)
+                'writer.WriteString("======================================================================================")
+                writer.WriteString(Environment.NewLine)
+                writer.WriteString(Environment.NewLine)
+
+
+                Dim Level2 As List(Of String) = subjectIndexCls.SelectSubjectIndexLevel2(strLevel1, si_Language)
+                For Each strLevel2 As String In Level2
+                    writer.WriteStartElement("p")
+                    writer.WriteStartElement("EBOLD")
+                    writer.WriteString(StrConv(strLevel2, VbStrConv.ProperCase))
+                    writer.WriteEndElement()
+                    writer.WriteEndElement()
+                    writer.WriteString(Environment.NewLine)
+                    writer.WriteString(Environment.NewLine)
+
+                    Dim Summary As List(Of String) = subjectIndexCls.SelectSubjectIndexSummary(strLevel1, strLevel2)
+
+                    For Each strSummary As String In Summary
+                        Dim summaryToWrite As String = strSummary
+                        'summaryToWrite = summaryToWrite.Replace("\""", "'")
+                        'If strSummary.Contains("alleged illegality of SPA") Then
+                        '    MsgBox(summaryToWrite)
+                        'End If
+
+                        writer.WriteStartElement("p")
+                        writer.WriteStartElement("ENORMAL")
+                        writer.WriteString(Trim(Trim(summaryToWrite) & " "))
+                        writer.WriteEndElement()
+                        writer.WriteEndElement()
+                        writer.WriteString(Environment.NewLine)
+
+                        Dim dataList As List(Of String) = subjectIndexCls.SelectSubjectIndexDataColl(strLevel1, strLevel2, strSummary)
+
+                        For Each strData In dataList
+                            Dim judgmentName As String = strData.Split("#")(0).Replace("''", "'")
+                            writer.WriteStartElement("p")
+                            writer.WriteStartElement("EGITALIC")
+                            writer.WriteString(ReplaceProperWords(StrConv(judgmentName, VbStrConv.ProperCase)))
+                            writer.WriteEndElement()
+                            writer.WriteEndElement()
+                            writer.WriteString(Environment.NewLine)
+
+                            Dim judgeName As String = strData.Split("#")(1).Replace("''", "'")
+                            writer.WriteStartElement("p")
+                            writer.WriteStartElement("EGNORMAL")
+                            writer.WriteString("(" & judgeName.Replace("&lt;NAME&gt;", "").Replace("&lt;/NAME&gt;", "").Replace("<NAME>", "").Replace("</NAME>", "") & ")")
+
+                            Dim Page As String = strData.Split("#")(2)
+                            writer.WriteString(Microsoft.VisualBasic.vbTab & Page)
+                            writer.WriteEndElement()
+                            writer.WriteEndElement()
+                            writer.WriteString(Environment.NewLine)
+                            writer.WriteString(Environment.NewLine)
+                        Next
+                        'writer.WriteStartElement("p")
+                        'writer.WriteStartElement("EGNORMAL")
+                        'writer.WriteEndElement()
+                        'writer.WriteEndElement()
+                        'writer.WriteString(Environment.NewLine)
+                        'writer.WriteString(Environment.NewLine)
+                    Next strSummary
+                Next strLevel2
+
+                writer.WriteString(Environment.NewLine)
+                'Next
+            Next strLevel1
+
+            'MALAY LANGUAGE'
+
+            si_Language = "malaysian"
+            Level1 = subjectIndexCls.SelectSubjectIndexLevel1(si_Language)
+            For Each strLevel1 As String In Level1
+                'writer.WriteString("======================================================================================")
+                'writer.WriteString(Environment.NewLine)
+                writer.WriteStartElement("p")
+                writer.WriteStartElement("EBOLD")
+                writer.WriteString(UCase(strLevel1))
+                writer.WriteEndElement()
+                writer.WriteEndElement()
+                'writer.WriteString(Environment.NewLine)
+                'writer.WriteString("======================================================================================")
+                writer.WriteString(Environment.NewLine)
+                writer.WriteString(Environment.NewLine)
+
+                Dim Level2 As List(Of String) = subjectIndexCls.SelectSubjectIndexLevel2(strLevel1, si_Language)
+                For Each strLevel2 As String In Level2
+                    writer.WriteStartElement("p")
+                    writer.WriteStartElement("EBOLD")
+                    writer.WriteString(StrConv(strLevel2, VbStrConv.ProperCase))
+                    writer.WriteEndElement()
+                    writer.WriteEndElement()
+                    writer.WriteString(Environment.NewLine)
+                    writer.WriteString(Environment.NewLine)
+
+                    Dim Summary As List(Of String) = subjectIndexCls.SelectSubjectIndexSummary(strLevel1, strLevel2)
+                    For Each strSummary As String In Summary
+                        Dim summaryToWrite As String = strSummary
+                        summaryToWrite = summaryToWrite.Replace("\""", "'")
+                        writer.WriteStartElement("p")
+                        writer.WriteStartElement("ENORMAL")
+                        writer.WriteString(Trim(summaryToWrite) & " ")
+                        writer.WriteEndElement()
+                        writer.WriteEndElement()
+                        writer.WriteString(Environment.NewLine)
+
+                        Dim judgmentName As String = subjectIndexCls.SelectSubjectIndexData(strLevel1, strLevel2, "judgmentName")
+                        writer.WriteStartElement("p")
+                        writer.WriteStartElement("EGITALIC")
+                        writer.WriteString(ReplaceProperWords(StrConv(judgmentName, VbStrConv.ProperCase)))
+                        writer.WriteEndElement()
+                        writer.WriteEndElement()
+                        writer.WriteString(Environment.NewLine)
+
+                        Dim judgeName As String = subjectIndexCls.SelectSubjectIndexData(strLevel1, strLevel2, "judgeName")
+                        writer.WriteStartElement("p")
+                        writer.WriteStartElement("EGNORMAL")
+                        writer.WriteString("(" & judgeName & ")")
+
+                        Dim Page As String = subjectIndexCls.SelectSubjectIndexPage(strLevel1, strLevel2, strSummary, si_Language)
+                        writer.WriteString(Microsoft.VisualBasic.vbTab & Page.Remove(Page.Length - 2, 1))
+                        writer.WriteEndElement()
+                        writer.WriteEndElement()
+                        writer.WriteString(Environment.NewLine)
+                        writer.WriteString(Environment.NewLine)
+
+                        'writer.WriteStartElement("p")
+                        'writer.WriteStartElement("EGNORMAL")
+                        'writer.WriteEndElement()
+                        'writer.WriteEndElement()
+                        'writer.WriteString(Environment.NewLine)
+                        'writer.WriteString(Environment.NewLine)
+                    Next strSummary
+                Next strLevel2
+                writer.WriteString(Environment.NewLine)
+                'Next
+            Next strLevel1
+        Catch ex As Exception
+        End Try
+
+        writer.WriteEndElement() ' end of subject_index
+        writer.WriteEndElement() ' end of contents
+        writer.WriteString(Environment.NewLine)
+        InfoTextProgress("Writing Subject Index... done")
+        writer.WriteEndDocument() '==> END OF ROOT
+        writer.Close()
+
+        InfoTextProgress("XML successfully written.")
+        If MsgBox("XML successfully written. Do you want to open it now?", vbYesNo, vbInformation) = MsgBoxResult.Yes Then
+            Process.Start(xmlFileName)
+        End If
+    End Sub
+
+    Private Shared Function MySQLEscapee(str As String) As String
+        Dim returnVal As String = ""
+        Dim tmpValue As String = ""
+
+        If str.Contains("\x00") Then
+            tmpValue = str.Replace("\x00", "\\0")
+        End If
+
+        If str.Contains("\b") Then
+            tmpValue = str.Replace("\b", "\\b")
+        End If
+
+        If str.Contains("\b") Then
+            tmpValue = str.Replace("\b", "\\b")
+        End If
+
+        If str.Contains("\b") Then
+            tmpValue = str.Replace("\b", "\\b")
+        End If
+
+        If str.Contains("\r") Then
+            tmpValue = str.Replace("\r", "\\r")
+        End If
+
+        If str.Contains("\n") Then
+            tmpValue = str.Replace("\n", "\\n")
+        End If
+
+        If str.Contains("\t") Then
+            tmpValue = str.Replace("\t", "\\t")
+        End If
+
+        If str.Contains("\u001A") Then
+            tmpValue = str.Replace("\u001A", "\\Z")
+        End If
+    End Function
+
+    Private Shared Function MySQLEscapeChar(strWord As String) As String
+        Return Regex.Replace(strWord, "[\x00'""\b\n\r\t\cZ\\%_]", Function(m As Match)
+                                                                      Dim v As String = m.Value
+                                                                      Select Case v
+                                                                          Case Is = "\x00" 'ASCII NUL (0x00) character
+                                                                              Return "\\0"
+
+                                                                          Case Is = "\b" 'BACKSPACE character
+                                                                              Return "\\b"
+
+                                                                          Case Is = "\n" 'NEWLINE (linefeed) character
+                                                                              Return "\\n"
+
+                                                                          Case Is = "\r" 'CARRIAGE RETURN character
+                                                                              Return "\\r"
+
+                                                                          Case Is = "\t" 'TAB
+                                                                              Return "\\t"
+
+                                                                          Case Is = "\u001A" 'Ctrl-Z
+                                                                              Return "\\Z"
+
+                                                                          Case Is = "\" 'backslash
+                                                                              Return ""
+
+                                                                          Case Else
+                                                                              Return "\\"  '& v
+
+                                                                      End Select
+                                                                  End Function)
+    End Function
+    Private Shared Function MySQLEscape(str As String) As String
+        Return Regex.Replace(str, "[\x00'""\b\n\r\t\cZ\\%_]", Function(m As Match)
+                                                                  Dim v As String = m.Value
+                                                                  Select Case v
+                                                                      Case Is = "\x00" 'ASCII NUL (0x00) character
+                                                                          Return "\0"
+
+                                                                      Case Is = "\b" 'BACKSPACE character
+                                                                          Return "\b"
+
+                                                                      Case Is = "\n" 'NEWLINE (linefeed) character
+                                                                          Return " "
+
+                                                                      Case "\r" 'CARRIAGE RETURN character
+                                                                          Return "\r"
+
+                                                                      Case Is = "\t" 'TAB
+                                                                          Return "\t"
+
+                                                                      Case Is = "\u001A" 'Ctrl-Z
+                                                                          Return "\Z"
+                                                                      Case Is = "\%"
+                                                                          Return " "
+
+                                                                      Case Else
+                                                                          Return v
+                                                                  End Select
+                                                              End Function)
+    End Function
+    Private Function PrintDatafilename(ByVal T As String) As String
+        Dim RC As String = ""
+        If T.Contains("  ") Then
+            RC = T.Replace("  ", " ")
+        Else
+            RC = T
+        End If
+        ' New Citation formate 
+        Try
+            If RC.Contains("_") Then
+                RC = RC.Trim()
+            Else
+                RC = RC.Replace("[", "").Replace("]", "").Trim()
+                Dim ArrTag() As String = RC.Split({" "}, StringSplitOptions.None)
+                If ArrTag.Count = 4 Then
+                    RC = ArrTag(2) & "_" & ArrTag(0) & "_" & ArrTag(1) & "_" & ArrTag(3)
+                Else
+                    RC = ArrTag(1) & "_" & ArrTag(0) & "_" & ArrTag(2)
+                End If
+            End If
+        Catch ex As Exception
+            '===== MsgBox(ex.Message & Environment.NewLine & T)
+        End Try
+        Return RC
+    End Function
+
+    Dim ReferredCasesExtractJudgment As String = "ReferredCasesExtractJudgment.txt"
+    Private Function ExtractReferredCasesHeadnote(ByVal XMLFilePath As String) As List(Of String)
+        Dim arrRefCasesList As List(Of String) = New List(Of String)
+        Dim myxmlcase As New xmlcase(XMLFilePath)
+
+        Dim xmlDoc As New XmlDocument
+        xmlDoc.Load(XMLFilePath)
+
+        Dim root As XmlNode = xmlDoc.DocumentElement
+        Dim strToAdd As String = ""
+        Dim refCaseDataFilename As String = Path.GetFileNameWithoutExtension(XMLFilePath) '#3
+        Dim refCaseCitation As String = ""
+        Dim refCaseTitle As String = ""
+        Dim refCaseType As String = "refd"
+        Dim refCaseTitleWithCitation As String = ""
+
+        Dim linkNodeList As XmlNodeList = xmlDoc.SelectNodes(root.Name & "//HEADNOTE//REFERRED_CASES//p")
+        For Each linkNode As XmlNode In linkNodeList
+            If linkNode.InnerXml.Contains("<LINK") Then '================CONTAINS LOCAL CASE LINKING======================================
+                Dim editedXML As New XmlDocument()
+                editedXML.LoadXml(linkNode.OuterXml)
+                Dim caseNodelist As XmlNodeList = editedXML.SelectNodes(editedXML.DocumentElement.Name & "//i//LINK")
+                For Each casenode As XmlNode In caseNodelist
+                    refCaseTitleWithCitation = casenode.InnerText
+                    refCaseCitation = Extractor.FindCitation(refCaseTitleWithCitation)
+                    Dim refCaseTitleWithType As String = Extractor.ReferredCases.FindReferredCasesTitle(refCaseTitleWithCitation)
+                    refCaseType = Extractor.ReferredCases.FindReferredCasesType(refCaseTitleWithType)
+                    refCaseTitle = refCaseTitleWithType.Replace(refCaseType, "").Replace("<p>", "").Replace("</p>", "")
+                    If refCaseTitle.Length = 0 Then
+                        refCaseTitle = subjectIndexCls.GetJudgmentNameFromCitation(refCaseCitation)
+                    End If
+                    If refCaseCitation.Contains("ERROR FOR") Then
+
+                    Else
+                        strToAdd = refCaseCitation.Trim & "#" & refCaseTitle.Trim & "#" & refCaseDataFilename.Trim & "#" & refCaseType.Trim & "#" ' & refCaseTitleWithCitation & "#"
+                        arrRefCasesList.Add(strToAdd)
+                    End If
+                Next
+            Else '=============FOREIGN CASES===================
+                refCaseTitleWithCitation = linkNode.OuterXml
+                refCaseCitation = Extractor.FindCitation(refCaseTitleWithCitation)
+                Dim refCaseTitleWithType As String = Extractor.ReferredCases.FindReferredCasesTitle(refCaseTitleWithCitation)
+                refCaseType = Extractor.ReferredCases.FindReferredCasesType(refCaseTitleWithType)
+                refCaseTitle = refCaseTitleWithType.Replace(refCaseType, "").Replace("<p>", "").Replace("</p>", "")
+                If refCaseCitation.Contains("ERROR FOR") Then
+                Else
+                    strToAdd = refCaseCitation.Trim & "#" & refCaseTitle.Trim & "#" & refCaseDataFilename.Trim & "#" & refCaseType.Trim & "#"
+                    arrRefCasesList.Add(strToAdd)
+                End If
+            End If
+        Next
+        Return arrRefCasesList
+    End Function
+
+    Private Sub btnExtractRefCases_Click(sender As Object, e As EventArgs) Handles btnExtractRefCases.Click
+        If chkboxdeldatacases.Checked Then
+            subjectIndexCls.Delete("ref_cases")
+        End If
+
+        'Dim result As DialogResult = folderdialogsubjectindex.ShowDialog()
+        'If result = DialogResult.OK Then
+        InfoTextProgress("Start Extracting Referred Cases From XML")
+        Dim files As String() = Directory.GetFiles(tempPath, "*.xml")
+
+        Dim rootCitation As String = ""
+        Dim referredCitation As String = ""
+        Dim referredTitle As String = ""
+        Dim referredType As String = ""
+        Dim referredDatafilename As String = ""
+
+        Dim insertSQL As String = ""
+
+        For Each strfilename As String In files
+            Dim referredCasesList As New List(Of String)
+            If utility.REFERRED_CASES_TYPE(strfilename) = True Then
+                referredCasesList = ExtractReferredCasesHeadnote(strfilename)
+            Else
+                ''''=====myfilesi = ExtractReferredCasesJudgment(strfilename) '====> SKIP FOR TEMPORARY
+            End If
+
+            For Each referredCase As String In referredCasesList
+                Try
+                    rootCitation = Path.GetFileNameWithoutExtension(strfilename)
+                    referredCitation = referredCase.Split({"#"}, StringSplitOptions.RemoveEmptyEntries)(0)
+                    referredTitle = utility.CorrectTextFormatSQL(referredCase.Split({"#"}, StringSplitOptions.RemoveEmptyEntries)(1))
+                    referredDatafilename = referredCase.Split({"#"}, StringSplitOptions.RemoveEmptyEntries)(2)
+                    referredType = referredCase.Split({"#"}, StringSplitOptions.RemoveEmptyEntries)(3)
+                    insertSQL = "insert into ref_cases (source_citation, source_datafilename, referred_citation, referred_title, referred_type) " & _
+                                            "values('" & utility.PrintCitation(referredDatafilename) & "','" & referredDatafilename & "','" & _
+                                            referredCitation & "','" & referredTitle & "','" & referredType & "')"
+                    subjectIndexCls.Insert(insertSQL)
+                Catch ex As Exception
+                    MsgBox("Error : " & referredCase)
+                    Continue For
+                End Try
+            Next
+            InfoTextProgress(" - " & Path.GetFileNameWithoutExtension(strfilename) & "...done")
+        Next
+        InfoTextProgress("Extract Referred Cases for " & files.Length.ToString() & " files successfully inserted.")
+        'End If
+    End Sub
+
+    Public Function removeSN(ByVal str As String)
+        Return str.Replace("SN", "")
+    End Function
+
+    Public Function ChangeLegislationsType(ByVal str As String) As String
+        Select Case str
+            Case Is = "order"
+                Return " O "
+            Case Is = "rule"
+                Return " r "
+            Case Is = "section"
+                Return " s "
+            Case Is = "art"
+                Return " art "
+            Case Is = "reg"
+                Return " reg "
+            Case Is = "item"
+                Return " item "
+            Case Else
+                Return ""
+        End Select
+    End Function
+
+    Public Function SortingIntoNewList(ByVal listwithcommaseparator As String) As List(Of String)
+        Dim lst As New List(Of String)
+        Dim arr() As String = listwithcommaseparator.Split({","}, StringSplitOptions.None)
+        For Each key As String In arr
+            lst.Add(key)
+        Next
+        Return lst
+    End Function
+    Dim LegislationExtJudgment As String = "LegislationExtJudgment.txt"
+    Public tmpXMLFile As String = "tmpXMLFile.xml"
+
+    Private Sub RemoveTagFromXMLSource(ByVal sourceXMLPath As String, ByVal tagName As String)
+        Dim xmlDoc As New XmlDocument
+        xmlDoc.Load(sourceXMLPath)
+        Dim xmlRoot As XmlNode
+        xmlRoot = xmlDoc.DocumentElement
+        Dim nodes As XmlNodeList
+        nodes = xmlDoc.SelectNodes(xmlRoot.Name & "//JUDGMENT//blockquote")
+        For Each node As XmlNode In nodes
+            If node IsNot Nothing Then
+                node.RemoveAll()
+                xmlDoc.Save(sourceXMLPath)
+            End If
+        Next
+        'If MsgBox("Open?", vbYesNo, "") = MsgBoxResult.Yes Then
+        '    Process.Start(tmpXMLFile)
+        'End If
+    End Sub
+    Private Function ExtractReferredLegislationJudgment(ByVal XMLFilePath As String) As List(Of String)
+        Dim myxmlcase As New xmlcase(XMLFilePath)
+        Dim pageNo As String
+        pageNo = myxmlcase.PAGE_NO
+
+        My.Computer.FileSystem.WriteAllText(LegislationExtJudgment, "", False)
+        Dim xmlDoc As New XmlDocument
+        xmlDoc.Load(XMLFilePath)
+
+        ' Dim judgmentNode As XmlNode
+        Dim root As XmlNode = xmlDoc.DocumentElement
+        Dim linkNodeList As XmlNodeList = xmlDoc.SelectNodes(root.Name & "//JUDGMENT//LINK")
+
+        Dim legisDataFilename As String = ""
+        Dim legisSection As String = ""
+        Dim legisTitle As String = ""
+        Dim legisLink As String = ""
+        Dim legisLinkLabel As String = ""
+        Dim caseDataFilename As String = ""
+        Dim caseTitle As String = ""
+        Dim caseLink As String = ""
+        Dim sectionType As String = ""
+        Dim arrLstTable As New List(Of String) 'returnList
+        Dim currentSectionType As String = ""
+        Dim legisWithSection As String = ""
+
+
+        For Each linkNode As XmlNode In linkNodeList
+            Dim HREFValue As String = linkNode.Attributes("HREF").InnerText
+            legisLinkLabel = linkNode.InnerText
+            sectionType = LegislationCharacter(linkNode.InnerText)
+
+            If HREFValue.StartsWith("legislation") Then
+                Try
+                    legisWithSection = HREFValue.Split({"?", ";;"}, StringSplitOptions.None)(1)
+                    legisDataFilename = HREFValue.Split({"?", ";"}, StringSplitOptions.RemoveEmptyEntries)(1)
+                    legisTitle = subjectIndexCls.getLegislationTitleByDatafilename(legisDataFilename & ".xml").Trim
+
+                    If legisDataFilename.Contains("MY_PUAS_2012_205") Or legisDataFilename.Contains("MY_PUAS_1980_050") Then
+                        legisSection = HREFValue.Split({";", ".;;"}, StringSplitOptions.RemoveEmptyEntries)(1)
+                    Else
+                        legisSection = HREFValue.Split({";", ".;"}, StringSplitOptions.RemoveEmptyEntries)(1)
+                    End If
+                    '                               0                   1               2                       3                   4                       5                           6       
+                    Dim stringToWrite As String = legisTitle & "#" & utility.PrintCitation(Path.GetFileNameWithoutExtension(XMLFilePath)) & "#" & legisDataFilename & "#" & legisSection & "#" & sectionType & "#" & legisWithSection & "#" & legisLinkLabel & "#" & Environment.NewLine
+                    arrLstTable.Add(stringToWrite)
+
+                Catch ex As Exception
+                    'legisSection = "AOS"
+                End Try
+
+                'My.Computer.FileSystem.WriteAllText(LegislationExtJudgment, stringToWrite, True)
+
+            Else ' If HREFValue.StartsWith("case_notes") Then' for cases reference  
+                'caseDataFilename = linkNode.InnerText
+                'MsgBox(caseDataFilename)
+
+            End If
+        Next
+        ListRemoveDups(arrLstTable)
+        Return arrLstTable
+    End Function
+
+    Public Function ExtractReferredLegislation(ByVal xmlFileName As String) As List(Of String)
+        Dim ReturnLegislationList As List(Of String) = New List(Of String)
+
+        Dim xmlPath As String = xmlFileName
+        Dim xmlDoc As XmlDocument = New XmlDocument
+
+        If My.Computer.FileSystem.FileExists(xmlPath) = True Then
+            xmlDoc.Load(xmlPath)
+        End If
+
+        'xmlDoc.InnerText = str
+        Dim nodelist As XmlNodeList
+        nodelist = xmlDoc.SelectNodes("//REFERRED_LEGISLATIONS//p")
+        Dim txtTowrite As String = Nothing
+
+        Dim strLegislationLink As String = ""
+        Dim legislationList As String = ""
+
+        For Each node As XmlNode In nodelist
+
+            If node.InnerText.Contains("Legislation referred to:") Or node.InnerText.Contains("Perundangan yang dirujuk:") Then
+                'do nothing ==> skip the paragraph that are only for title
+
+            Else
+                strLegislationLink = ""
+                strLegislationLink = node.InnerText
+
+                ' =========================================================
+                ' ==== extract legislation title and section into this area
+                ' =========================================================
+
+                Dim strLinkType As String = "Section"
+                Dim strLegislation As String = ""
+                Dim sectionList As String()
+                Dim strSectionList As String = ""
+                Dim strSectionNo As String = ""
+
+                Try
+                    strLegislation = strLegislationLink.Split({","}, StringSplitOptions.RemoveEmptyEntries)(0)
+                    strSectionList = strLegislationLink.Replace(strLegislation, "")
+                    sectionList = strSectionList.Split({","}, StringSplitOptions.None)
+                    sectionList.Distinct()
+
+                    Dim currentActType As String = "NONE"
+                    For Each strSectionNo In sectionList
+
+                        If strSectionNo.Length > 0 Then
+                            If strLegislation.Contains("[") Then
+                            Else
+                                Dim actType As String
+                                If isContainMarker(strSectionNo) Then
+                                    currentActType = LinkingNoType(strSectionNo)
+                                    actType = currentActType
+                                Else
+                                    actType = currentActType
+                                End If
+
+                                If actType = "NOT SET" Then
+                                    actType = currentActType
+                                End If
+                                ReturnLegislationList.Add(Path.GetFileNameWithoutExtension(xmlPath) + "#" + strLegislationLink + "#" + strLegislation + "#" + strSectionNo.Trim + "#" + strSectionNo + "#" + actType + Environment.NewLine)
+                            End If
+                        End If
+                    Next
+                Catch ex As Exception
+                    MsgBox(ex.Message)
+                End Try
+            End If
+        Next
+        ListRemoveDups(ReturnLegislationList, False)
+        Return ReturnLegislationList
+
+    End Function
+
+    Function StripTags(ByVal html As String) As String
+        ' Remove HTML tags.
+        Return Regex.Replace(html, "<.*?>", "").Replace(", ", ",")
+    End Function
+    Public legislationVolume As String = "legislationVolume.txt"
+    Private Function ExtractReferredLegislationHeadnote(ByVal XMLFilePath As String) As List(Of String)
+        Dim resultList As List(Of String) = New List(Of String)
+        Dim xmlDoc As New XmlDocument
+        xmlDoc.Load(XMLFilePath)
+        Dim root As XmlNode = xmlDoc.DocumentElement
+        Dim nodeList As XmlNodeList = xmlDoc.SelectNodes(root.Name & "//HEADNOTE//REFERRED_LEGISLATIONS//p")
+        Dim sectionList As List(Of String) = New List(Of String)
+        For Each node As XmlNode In nodeList
+            If node.InnerText.Contains("Legislation referred to:") Or node.InnerText.Contains("Perundangan yang dirujuk:") Then
+                ' this ignore because its not contain any legislation
+            Else
+                Dim stringToWrite As String = root.Name & "#" & node.InnerText & Environment.NewLine
+                My.Computer.FileSystem.WriteAllText(legislationVolume, stringToWrite, True)
+                sectionList = ExtractReferredLegislationFromText(node.InnerText)
+                For Each sec As String In sectionList
+                    My.Computer.FileSystem.WriteAllText("legislationExtract.txt", sec & Environment.NewLine, True)
+                    Dim tLegislationTitle As String = sec.Split({"#"}, StringSplitOptions.None)(0)
+                    Dim tSection As String = sec.Split({"#"}, StringSplitOptions.None)(1)
+                    Dim tPageno As String = utility.GetPageNo(XMLFilePath)
+                    Dim tCitation As String = utility.PrintCitation(Path.GetFileNameWithoutExtension(XMLFilePath))
+                    resultList.Add(tLegislationTitle & "#" & tCitation & "#" & "NOT AVAILABLE #" & tSection & "#" & tSection & "#" & tSection & "#" & tSection & "#" & Environment.NewLine)
+                Next
+            End If
+        Next
+        ListRemoveDups(resultList)
+        Return resultList
+    End Function
+
+    Private Sub ExtractReferredLegislationXXX(ByVal XMLFilePath As String)
+        Dim resultList As List(Of String) = New List(Of String)
+        Dim xmlDoc As New XmlDocument
+        xmlDoc.Load(XMLFilePath)
+        Dim root As XmlNode = xmlDoc.DocumentElement
+        Dim nodeList As XmlNodeList = xmlDoc.SelectNodes(root.Name & "//HEADNOTE//REFERRED_LEGISLATIONS//p")
+        Dim sectionList As List(Of String) = New List(Of String)
+
+        Dim datafilename As String = Path.GetFileNameWithoutExtension(XMLFilePath)
+        Dim legis_filename As String = ""
+        Dim legis_no As String = ""
+        Dim legis_text As String = ""
+        For Each node As XmlNode In nodeList
+            If node.InnerText.Contains("Legislation referred to:") Or node.InnerText.Contains("Perundangan yang dirujuk:") Then
+                ' this ignore because its not contain any legislation
+            Else
+                If node.InnerXml.Contains("LINK") Then
+                    Dim newNodelist As XmlNodeList
+                    newNodelist = node.SelectNodes("LINK")
+                    legis_text = node.InnerText
+                    Dim hrefValue As String = ""
+                    Dim countSemicolon As Integer = 0
+
+                    For Each newNode As XmlNode In newNodelist
+                        hrefValue = newNode.Attributes("HREF").Value.Split({"?"}, StringSplitOptions.None)(1)
+                        countSemicolon = Regex.Matches(hrefValue, ";").Count
+                        If countSemicolon > 2 Then
+                            legis_filename = hrefValue.Split(";")(0)
+                            legis_no = hrefValue.Split(";")(1)
+                            legis_text = newNode.InnerText
+                        Else
+                            legis_filename = hrefValue.Split(";")(0)
+                            legis_text = newNode.InnerText
+                        End If
+                        MsgBox(legis_filename & Environment.NewLine & legis_no & Environment.NewLine & legis_text)
+                    Next
+
+
+                Else 'no linking legis
+                End If
+
+                If node.InnerXml.Contains("<LINK") Then
+
+                Else
+
+                End If
+                Dim stringToWrite As String = root.Name & "#" & node.InnerText & Environment.NewLine
+                My.Computer.FileSystem.WriteAllText(legislationVolume, stringToWrite, True)
+                sectionList = ExtractReferredLegislationFromText(node.InnerText)
+                'For Each sec As String In sectionList
+                '    My.Computer.FileSystem.WriteAllText("legislationExtract.txt", sec & Environment.NewLine, True)
+                '    Dim tLegislationTitle As String = sec.Split({"#"}, StringSplitOptions.None)(0)
+                '    Dim tSection As String = sec.Split({"#"}, StringSplitOptions.None)(1)
+                '    Dim tPageno As String = utility.GetPageNo(XMLFilePath)
+                '    Dim tCitation As String = utility.PrintCitation(Path.GetFileNameWithoutExtension(XMLFilePath))
+                '    '  MsgBox(tLegislationTitle & "#" & tCitation & "#" & "NOT AVAILABLE #" & tSection & "#" & tSection & "#" & tSection & "#" & tSection & "#" & Environment.NewLine)
+                'Next
+            End If
+        Next
+        ListRemoveDups(resultList)
+    End Sub
+
+    Private Function ExtractReferredLegislationFromText(ByVal text As String) As List(Of String)
+
+        Dim patternBoth As String = "(\([0-9]{1,3}\))(\([a-z]{1,3}\))"
+        Dim patternNumber As String = "(\([0-9]{1,3}\))"
+        Dim patternString As String = "(\([a-z]{1,3}\))"
+
+        Dim regexBoth As New Regex(patternBoth)
+        Dim regexNumber As New Regex(patternNumber)
+        Dim regexString As New Regex(patternString)
+
+        Dim strText As String = StripTags(text)
+        Dim arrText As String() = strText.Split({","}, StringSplitOptions.None)
+        Dim curMainSection As String = ""
+        Dim counter As Integer = 1
+        Dim arrList As List(Of String) = New List(Of String)
+        Dim title As String = arrText(0)
+
+        For counter = 1 To arrText.Length - 1 Step 1
+            'If GotMainLegislationChar(arrText(counter)) = True Then
+
+            'Else
+            If arrText(counter).Trim.StartsWith("(") Then
+                Dim matchBoth As Match = regexBoth.Match(arrText(counter))
+                If matchBoth.Success Then
+                    curMainSection = Regex.Replace(curMainSection, patternBoth, arrText(counter).Trim)
+                Else
+                    Dim matchNumber As Match = regexNumber.Match(arrText(counter))
+                    If matchNumber.Success() Then
+                        curMainSection = Regex.Replace(curMainSection, patternNumber, arrText(counter).Trim)
+                    Else
+                        Dim matchString As Match = regexString.Match(arrText(counter))
+                        If matchString.Success() Then
+                            curMainSection = Regex.Replace(curMainSection, patternString, arrText(counter).Trim)
+                        End If
+                    End If
+                End If
+            Else ' NOT START WITH BRACKET "
+                curMainSection = arrText(counter)
+            End If
+            'End If
+            arrList.Add(curMainSection)
+        Next
+
+        Dim listResult As List(Of String) = New List(Of String)
+        Dim currentType As String = ""
+        Dim pattern1 As String = "\w+\s([0-9|A-Z]{1,3})(\(\w+\)){0,20}"
+        Dim r As New Regex(pattern1)
+
+        For Each s As String In arrList
+            Dim m As Match = r.Match(s)
+            If m.Success Then
+                currentType = LegislationCharacter(s)
+                listResult.Add(title & "#" & s)
+                Continue For
+            Else
+                listResult.Add(title & "#" & currentType & " " & s)
+            End If
+        Next
+        Return listResult
+    End Function
+
+    Private Function GotMainLegislationChar(ByVal s As String) As Boolean
+        Dim result As Boolean = False
+        If s.Contains("O ") And s.Contains("r ") Then 'Or s.Contains("order") Or s.Contains("aturan") Then
+            result = True
+        ElseIf s.Contains("ss ") Or s.Contains("s ") Or s.Contains("section") Or s.Contains("seksyen") Then
+            result = True
+        ElseIf s.Contains("reg ") Or s.Contains("regs ") Or s.Contains("reg") Then
+            result = True
+        ElseIf s.Contains("art ") Or s.Contains("arts ") Or s.Contains("article") Or s.Contains("artikel") Then
+            result = True
+        ElseIf s.Contains("rr ") Or s.Contains("r ") Or s.Contains("rule") Or s.Contains("kaedah") Then
+            result = True
+        ElseIf s.Contains("item ") Or s.Contains("items ") Or s.Contains("item") Then
+            result = True
+        Else
+            result = False
+        End If
+        Return result
+    End Function
+
+    Private Function ExtractReferredCasesJudgment(ByVal XMLFilePath As String) As List(Of String)
+        Dim arrRefCasesList As List(Of String) = New List(Of String)
+        Dim myxmlcase As New xmlcase(XMLFilePath)
+
+        Dim pageNo As String
+        pageNo = myxmlcase.PAGE_NO
+
+        My.Computer.FileSystem.WriteAllText(LegislationExtJudgment, "", False)
+        Dim xmlDoc As New XmlDocument
+        xmlDoc.Load(XMLFilePath)
+
+        Dim root As XmlNode = xmlDoc.DocumentElement
+        Dim linkNodeList As XmlNodeList = xmlDoc.SelectNodes(root.Name & "//JUDGMENT//LINK")
+        Dim refCaseDataFilename As String = ""
+        Dim refCaseCitation As String = ""
+        Dim refCaseTitle As String = ""
+        Dim refCaseType As String = "refd"
+
+        For Each linkNode As XmlNode In linkNodeList
+            Dim strToAdd As String = ""
+            Dim refCaseTitleWithCitation As String = linkNode.InnerText
+
+            Dim HREFValue As String = linkNode.Attributes("HREF").InnerText
+            If HREFValue.StartsWith("case_notes") Then
+                If refCaseTitleWithCitation.Contains("[") Then
+                    refCaseDataFilename = Path.GetFileNameWithoutExtension(XMLFilePath)
+                    refCaseCitation = "[" & refCaseTitleWithCitation.Split({"["}, StringSplitOptions.None)(1)
+                    Try
+                        refCaseTitle = refCaseTitleWithCitation.Split({"["}, StringSplitOptions.None)(0)
+                        If refCaseTitle.Length < 1 Then
+                            refCaseTitle = subjectIndexCls.getCasesTitleByCitation(refCaseCitation)
+                            refCaseTitle = StrConv(refCaseTitle, VbStrConv.ProperCase)
+                        End If
+                    Catch ex As Exception
+                        MsgBox(ex.Message)
+                    End Try
+
+                Else
+                    'skip due to citation format error=====================================================================
+                End If
+                strToAdd = refCaseCitation.Trim & "#" & refCaseTitle.Trim & "#" & refCaseDataFilename.Trim & "#" & refCaseType.Trim & "#"
+                arrRefCasesList.Add(strToAdd)
+            End If
+        Next
+        ListRemoveDups(arrRefCasesList)
+        Return arrRefCasesList
+    End Function
+
+
+
+    Public Function isForeignCaseTitle(ByVal s As String) As Boolean
+        If s.Contains(" v ") Then
+            Return True
+        ElseIf s.Contains(" v. ") Then
+            Return True
+        ElseIf s.Contains(" In Re ") Or s.Contains(" In re ") Then
+            Return True
+        ElseIf s.Contains(" Re ") Or s.Contains(" re ") Then
+            Return True
+        Else
+            Return False
+        End If
+    End Function
+
+    Public Function ExtractForeignCasesReferred(ByVal XMLFilePath As String) As List(Of String)
+        Dim arrRefCasesList As List(Of String) = New List(Of String)
+        Dim myxmlcase As New xmlcase(XMLFilePath)
+
+        Dim pageNo As String
+        pageNo = myxmlcase.PAGE_NO
+
+        'My.Computer.FileSystem.WriteAllText(LegislationExtJudgment, "", False)
+        Dim xmlDoc As New XmlDocument
+        xmlDoc.Load(XMLFilePath)
+
+        Dim root As XmlNode = xmlDoc.DocumentElement
+        Dim linkNodeList As XmlNodeList = xmlDoc.SelectNodes(root.Name & "//JUDGMENT//i")
+
+        Dim refCaseDataFilename As String = ""
+        Dim refCaseCitation As String = ""
+        Dim refCaseTitle As String = ""
+        Dim refCaseType As String = "refd"
+
+        For Each node As XmlNode In linkNodeList
+            If isForeignCaseTitle(node.InnerXml) = True Then
+                Dim strToAdd As String = ""
+                Dim refCaseTitleWithCitation As String = node.InnerXml
+
+                refCaseDataFilename = Path.GetFileNameWithoutExtension(XMLFilePath)
+
+                refCaseCitation = refCaseTitleWithCitation.Split({"</i>"}, StringSplitOptions.None)(1)
+            End If
+        Next
+
+    End Function
+
+    Public Function GetLinkingType(ByVal linkingText As String) As String
+        If linkingText.Contains("ss ") Or linkingText.Contains("s ") Then
+            Return "Section"
+        ElseIf linkingText.Contains("act ") Then
+            Return "Act"
+        ElseIf linkingText.Contains("reg") Then
+            Return "Regulation"
+        ElseIf linkingText.Contains("O ") Then
+            Return "Order "
+        Else
+            Return "NOT SET"
+        End If
+    End Function
+    Public Function LinkingNoType(ByVal linkingText As String) As String
+
+        Dim currentNoType As String = ""
+
+        If linkingText.Contains("ss ") Or linkingText.Contains("s ") Then
+            currentNoType = "s "
+
+        ElseIf linkingText.Contains("acts ") Or linkingText.Contains("act ") Then
+            currentNoType = "act "
+
+        ElseIf linkingText.Contains("regs ") Or linkingText.Contains("reg ") Then
+            currentNoType = "reg "
+
+        ElseIf linkingText.Contains("arts ") Or linkingText.Contains("art ") Then
+            currentNoType = "art "
+
+        Else
+            currentNoType = "NOT SET"
+        End If
+
+        Return currentNoType
+
+    End Function
+    Public Function isContainMarker(ByVal linkingText As String) As Boolean
+        If linkingText.Contains("ss ") Or linkingText.Contains("s ") Or linkingText.Contains("acts ") Or linkingText.Contains("act ") Or _
+            linkingText.Contains("regs ") Or linkingText.Contains("reg ") Or linkingText.Contains("arts ") Or linkingText.Contains("art ") _
+            Then
+            Return True
+        Else
+            Return False
+        End If
+    End Function
+    Public Function GetLegislationCitation(ByVal legislationTitle As String) As String
+
+    End Function
+    Private Function LegislationCharacter(ByVal s As String) As String
+        If s.Contains("O ") And s.Contains("r ") Then 'Or s.Contains("order") Or s.Contains("aturan") Then
+            Return s
+
+        ElseIf s.Contains("ss ") Or s.Contains("s ") Or s.Contains("section") Or s.Contains("seksyen") Then
+            Return "s"
+
+        ElseIf s.Contains("reg ") Or s.Contains("regs ") Or s.Contains("reg") Then
+            Return "reg"
+
+        ElseIf s.Contains("art ") Or s.Contains("arts ") Or s.Contains("article") Or s.Contains("artikel") Then
+            Return "art"
+
+        ElseIf s.Contains("rr ") Or s.Contains("r ") Or s.Contains("rule") Or s.Contains("kaedah") Then
+            Return "r"
+
+        ElseIf s.Contains("item ") Or s.Contains("items ") Or s.Contains("item") Then
+            Return "item"
+
+
+        Else
+            Return "N/A"
+        End If
+
+    End Function
+    Public Shared Function ListRemoveDups(ByVal Source As List(Of String), Optional ByVal MatchCase As Boolean = False)
+        'Sort the array
+        Source.Sort()
+
+        'Do the duplicates remove.
+        For x As Integer = Source.Count - 1 To 1 Step -1
+            'Check if we want 
+            If MatchCase Then
+                'Do the check
+                If Source(x).ToLower() = Source(x - 1).ToLower() Then
+                    Source.RemoveAt(x)
+                End If
+            Else
+                'Do the check
+                If Source(x) = Source(x - 1) Then
+                    Source.RemoveAt(x)
+                End If
+            End If
+        Next x
+    End Function
+
+    Private Shared Function ReplaceWordForRulesOfCourt(ByVal s As String)
+        Dim returnValue As String
+        returnValue = s.Replace("RC", "").Replace("ROC", "").Replace("Rules of Court 2012", "").Replace("RHC", "") _
+            .Replace("rules of the high court", "").Replace("rules of high court", "") _
+            .Replace(",", "").Replace("  ", " ").Replace("rr", "r").Replace("Rules", "").Replace("Arts", "art").Replace("regs", "reg")
+        Return returnValue.Trim
+    End Function
+
+    Private Shared Function ValueNum(ByVal value As String) As Integer
+        Dim returnVal As String = String.Empty
+        Dim collection As MatchCollection = Regex.Matches(value, "\d+")
+        For Each m As Match In collection
+            returnVal += m.ToString()
+        Next
+        Return Convert.ToInt32(returnVal)
+    End Function
+
+    Public Function matchSectionValue(ByVal sourceString As String) As String
+        Dim result As String = ""
+        Dim regexPattern1 As String
+        Dim regexPattern2 As String
+        Dim regexPattern3 As String
+
+        regexPattern1 = "^\w+\s([0-9]{1,3})([A-Z]{1,2})(\(\w+\)){0,20}" ' sample S 39B
+        regexPattern2 = "^\w+\s[0-9]{1,3} \w+ [0-9]{1,3}(\(\w+\)){0,20}"
+        regexPattern3 = "^\w+\s([0-9]{1,3})(\(\w+\)){0,20}"
+
+        Dim m1 As Match = Regex.Match(sourceString, regexPattern1)
+        Dim m2 As Match = Regex.Match(sourceString, regexPattern2)
+        Dim m3 As Match = Regex.Match(sourceString, regexPattern3)
+
+        If m1.Success Then
+            result = m1.Value
+        Else
+            If m2.Success Then
+                result = m2.Value
+            Else
+                If m3.Success Then
+                    result = m3.Value
+                Else
+                    Return sourceString
+                End If
+            End If
+        End If
+        Return result
+    End Function
+
+    Private Function GetSectionFromString(ByVal sourceString As String) As String
+        Dim txtWordToReplace As String = "wordstoreplace.txt"
+
+        Dim result As String = ""
+        If sourceString.Contains("of") Then
+            sourceString = sourceString.Split({"of"}, StringSplitOptions.None)(0)
+
+        ElseIf sourceString.Contains("Of") Then
+            sourceString = sourceString.Split({"Of"}, StringSplitOptions.None)(0)
+
+        ElseIf sourceString.Contains("Akta") Then
+            sourceString = sourceString.Split({"Akta"}, StringSplitOptions.None)(0)
+
+        Else
+            sourceString = sourceString
+        End If
+
+        sourceString = sourceString.Trim 'remove leading space
+
+        '================================================================================================
+        Dim arrWords As String() = File.ReadAllLines(txtWordToReplace)
+        Dim oriText As String
+        Dim replaceText As String
+
+        For Each w As String In arrWords
+            oriText = w.Split("#")(0)
+            replaceText = w.Split("#")(1)
+            sourceString = sourceString.Replace(oriText, replaceText)
+        Next
+
+        result = matchSectionValue(sourceString)
+        'result = sourceString.Replace("Section", "s").Replace("section", "s").Replace("rr", "r").Replace("ss", "s").Replace("Orders", "O").Replace("Order", "O") _
+        '    .Replace("Rules", "r").Replace("Rule", "r").Replace("rules", "r").Replace("rule", "r").Replace("Articles", "art").Replace("Article", "art").Replace("subsection", "s") _
+        '    .Replace("sub-section", "s").Replace("subs", "s").Replace("sub-s", "s").Replace("arts", "art")
+        'Call matchSectionValue(result)
+        Return result
+
+    End Function
+    Private Sub btnExtractRefLegislation_Click(sender As Object, e As EventArgs) Handles btnExtractRefLegislation.Click
+
+        My.Computer.FileSystem.WriteAllText(legislationVolume, "", False)
+        My.Computer.FileSystem.WriteAllText("legislationExtract.txt", "", False)
+        My.Computer.FileSystem.WriteAllText("legisLink.txt", "", False)
+        My.Computer.FileSystem.WriteAllText("insertSQL.txt", "", False) ' try to view sql command before insert
+        My.Computer.FileSystem.WriteAllText("myfilesi.txt", "", False)
+
+        If chkboxdeldatalegislation.Checked Then
+            subjectIndexCls.Delete("ref_legislation")
+        End If
+
+        
+            InfoTextProgress("Start Extracting Referred legislations")
+
+            Dim files As String() = Directory.GetFiles(tempPath, "*.xml")
+
+            Dim judgname As String = ""
+            Dim judgmentname As String = ""
+            Dim catchwords As String = ""
+            Dim pageno As String = ""
+            Dim sections As String = ""
+            Dim legisAll As String = ""
+            Dim legisTitle As String = ""
+            Dim legisLink As String = ""
+            Dim legisLabelLink As String = ""
+            Dim legisCitation As String = ""
+            Dim legisSecOrder As String = ""
+            Dim secNo As String = ""
+            Dim secType As String = ""
+            Dim subSecNo As String = ""
+            Dim subSecType As String = ""
+            Dim strSQL As String = ""
+
+            For Each strfilename As String In files
+                ' REMOVE BLOCKQUOTE TAG FOR EACH XML INSIDE TEMP FOLDER
+                RemoveTagFromXMLSource(strfilename, "//judgment//blockquote")
+            Next
+
+            For Each strfilename As String In files
+                ' Application.DoEvents()
+                lblfn.Text = "FileName : " + Path.GetFileNameWithoutExtension(strfilename)
+                Dim myxmlcase As New xmlcase(strfilename)
+
+                Dim referredLegislationList As New List(Of String)
+
+                If utility.REFERRED_LEGISLATION_TYPE(strfilename) = True Then
+                    referredLegislationList = ExtractReferredLegislationHeadnote(strfilename)
+                Else
+                    'myfilesi = ExtractReferredLegislationJudgment(strfilename)
+                End If
+
+                For Each referredLegislation As String In referredLegislationList
+                    My.Computer.FileSystem.WriteAllText("myfilesi.txt", referredLegislation, True)
+                    legisLink = referredLegislation.Split(New String() {"#"}, StringSplitOptions.None)(0)
+                    legisAll = referredLegislation.Split(New String() {"#"}, StringSplitOptions.None)(1)
+                    secNo = referredLegislation.Split(New String() {"#"}, StringSplitOptions.None)(2)
+                    legisLabelLink = referredLegislation.Split(New String() {"#"}, StringSplitOptions.None)(6)
+                Next
+                InfoTextProgress(" - " & Path.GetFileNameWithoutExtension(strfilename) & "...done")
+            Next
+          
+            Dim listofLegislation As New List(Of String)
+            For Each strLegislation As String In File.ReadAllLines("myfilesi.txt")
+                listofLegislation.Add(strLegislation)
+            Next
+
+            ListRemoveDups(listofLegislation, False)
+            My.Computer.FileSystem.WriteAllText("testXML.txt", "", False)
+
+            For Each s As String In listofLegislation
+                Dim sLegislation As String = ""
+                Dim sLegislationCitation As String = ""
+                Dim sLegislationLabelLink As String = ""
+                Dim sPageNo As String = ""
+                Dim sSectionNo As String = ""
+                Dim sSection As String = ""
+                Dim sSecType As String = ""
+                Dim sSubNo As String = ""
+                Dim sSubType As String = ""
+                Dim sSectionStringValue As String = "'"
+                Dim sSortingValue As Integer
+                Try
+                    sLegislation = s.Split("#")(0)
+                    sPageNo = s.Split("#")(1)
+                    sLegislationCitation = s.Split("#")(2)
+                    sSection = GetSectionFromString(s.Split("#")(6))
+                    sSecType = s.Split("#")(4)
+                    sLegislationLabelLink = GetSectionFromString(s.Split("#")(6))
+
+                    My.Computer.FileSystem.WriteAllText("testXML.txt", s & Environment.NewLine, True)
+                    If sSecType.Contains("N/A") Or sSecType = "" Then
+                        ' ==== do nothing =============================================>>>>>>
+                    Else
+                        
+                        Dim strSQL2 As String = "insert into reflegislation(utilities.correctformatsql(legislation), pageno,  section, sortvalue, label, stringvalue) " & _
+                            "values('" & sLegislation & "','" & sPageNo & "','" & sSection & "','" & utility.RemoveStringFromInput(sSection) & "','" & sLegislationLabelLink & "','" & utility.RemoveNumberFromInput(sSection) & "')"
+                        subjectIndexCls.Insert(strSQL2)
+                    End If
+                Catch ex As Exception
+                    'MsgBox(ex.Message & " " & s)
+                End Try
+            Next
+
+            InfoTextProgress("Legislations data for " & files.Length.ToString() & " files successfully inserted.")
+    End Sub
+    Private Sub btnPath_Click(sender As Object, e As EventArgs) Handles btnPath.Click
+        sfd.Title = "Choose your save location for XML File"
+        'sfd.FileName = folderdialogsubjectindex.SelectedPath
+        sfd.Filter = "XML Files(*.XML)|*.XML"
+        If sfd.ShowDialog = Windows.Forms.DialogResult.OK Then
+            If sfd.FileName <> "" Then
+                File.Create(sfd.FileName).Dispose()
+                lblPath.Text = sfd.FileName
+            End If
+        End If
+    End Sub
+
+    Public Sub LegislationLinkChecker(ByVal filePath As String)
+        Dim strError As String = ""
+        Dim xDoc As New XmlDocument
+        Dim Nodelst As XmlNodeList
+        Dim XmlSub As New XmlDocument
+        Dim xmlLink As XmlNodeList
+        Dim LegislationReferred As New List(Of String)
+        Dim LegislationTitle As String
+
+        xDoc.Load(filePath)
+
+        'get REFERRED_LEGISLATION
+        Nodelst = xDoc.GetElementsByTagName("REFERRED_LEGISLATIONS")
+        For Each xn As XmlNode In Nodelst
+            XmlSub.LoadXml(xn.OuterXml)
+            xmlLink = XmlSub.GetElementsByTagName("LINK")
+            ' MsgBox(xmlLink(2).InnerText)
+
+            '   For Each node As String In xmlLink
+            '   Next
+            '   XmlSub.LoadXml(xn.OuterXml())
+            '   xmlLink = XmlSub.GetElementsByTagName("LINK")
+
+            'If xmlLink.Count > 0 Then
+            '    For i = 0 To xmlLink.Count - 1
+            '        LegislationTitle = xmlLink(i).InnerXml
+            '        Dim j As Integer = 0
+            '        'Do Until LegislationTitle.Length > 10
+            '        Do Until Not IsNumeric(LegislationTitle(0))
+            '            'to detect wether legis to link is contain act name
+            '            LegislationTitle = xmlLink(i - j).InnerXml
+            '            j = j + 1
+            '        Loop
+            '        LegislationReferred.Add(LegislationTitle & "XXX" & xmlLink(i).Attributes("HREF").Value())
+            '    Next
+            'End If
+        Next
+
+        ' ''''' connect to db for checking
+        'Dim dTable As New DataTable
+        'Dim strSQL As String
+
+        'Dim referTitle As String = ""
+        'Dim referLink As String = ""
+        'Dim referCategory As String = ""
+        'Dim referTitleCategory As String
+
+        'Dim referAct As String = ""
+        'Dim referNo As String = ""
+
+        'Dim referSection As String = ""
+        'Dim referRules As String = ""
+        'Dim referOrder As String = ""
+        'Dim referSearch As String = ""
+
+        'Dim strAll As String = ""
+        'Dim strLegisTitle As String = ""
+
+        'For Each strLegisLink As String In LegislationReferred
+
+        '    referTitleCategory = strLegisLink.Split({"XXX"}, StringSplitOptions.None)(0) ' store legislation title for comparison method
+        '    'MsgBox(referTitleCategory)
+        '    If referTitleCategory.Contains(",") Then
+        '        referTitle = referTitleCategory.Split(",")(0)
+        '        referCategory = referTitleCategory.Split(",")(1)
+        '    Else
+        '        referAct = referTitleCategory
+        '        referCategory = ""
+        '    End If
+
+        '    If referCategory = "(" Then
+        '        referCategory = referCategory.Remove(referCategory.Length - 3, 3)
+        '    End If
+
+        '    referLink = strLegisLink.Split({"XXX"}, StringSplitOptions.None)(1)
+        '    referAct = referLink.Split("?")(1).Split(";")(0)
+        '    referNo = referLink.Split(";")(1).Split(";;")(0)
+
+        '    If referAct = "MY_ACTS_1958_81" Then
+        '        strSQL = "select * from legislation where datafilename like '%" & referAct & "%'"
+        '    Else
+
+        '        If referCategory.Contains(" ss ") Or referCategory.Contains(" s ") Then
+        '            referSearch = referCategory.Replace(" ss ", "").Replace(" s ", "").Replace(" ", "")
+        '            referSearch = referNo
+        '            strSQL = "select * from secion_tb1 where legfile like '%" & referAct & "%' and sec_no like '" & referSearch & "%'"
+        '        Else
+
+        '            strSQL = "select * from legislation where datafilename like '%" & referAct & "%'"
+        '        End If
+
+        '    End If
+
+        '    dTable = EXcuteQuery(strSQL)
+
+        '    If dTable.Rows.Count > 0 Then
+        '        ' legislation referred found in database
+        '        strError = ""
+        '    Else
+        '        strError = "<span style='color:Red; font-weight:700;'>Please Check Xml File Error is: Couldn't find Referred Legislation:" & referAct & "  with Section:" & referSearch & " in database.</span>"
+        '        'Exit For
+        '        Return strError
+        '    End If
+        'Next
+
+        ''strError = strAll
+        ''MsgBox(referSection)
+        'Return strError
+
+    End Sub
+
+    Private Sub cboMode_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboMode.SelectedIndexChanged
+        If cboMode.Text = "OFFLINE" Then
+            btnUpdate.Enabled = False
+        Else
+            btnUpdate.Enabled = True
+        End If
+    End Sub
+
+    Public Sub ExtractLegislation()
+        Dim folderpath As String = folderdialogsubjectindex.SelectedPath
+        folderpath = "E:\TEMP_WORK\MLRA_2011_1"
+        Dim arrErrorList As New List(Of String)
+        Dim counter = 0
+        Dim listFile As String() = Directory.GetFiles(folderpath)
+        Dim legisList As String = "legisList.txt"
+        For Each strFilename As String In listFile
+            Dim filename As String = folderpath & "\" & strFilename
+            If File.Exists(filename) = True Then
+                counter = counter + 1
+                Try
+                    Dim xmlDoc As New XmlDocument
+                    xmlDoc.Load(filename)
+                    xmlDoc.RemoveChild(xmlDoc.SelectSingleNode("BLOCKQUOTE"))
+                    xmlDoc.Save("tmpFolder\\tmp_" & strFilename)
+
+                    Dim root As XmlNode = xmlDoc.DocumentElement
+                    Dim judgmentNode As XmlNodeList
+                    judgmentNode = xmlDoc.SelectNodes(root.Name & "//JUDGMENT//LINK")
+
+                    For Each node As XmlNode In judgmentNode
+                        Dim strLegis As String = node.Attributes("HREF").Value
+                        If strLegis.StartsWith("legislation") = True Then
+                            Dim legisNo As String = strLegis.Split({"?", ";;"}, StringSplitOptions.None)(1)
+
+                            If legisNo.EndsWith(";") Then
+                                legisNo = legisNo.Remove(legisNo.Count - 1, 1)
+                            End If
+
+                            Dim strToWrite As String = filename.Replace("C:\eLaw\eLaw_Data_Files\eLaw_Data_Files\cases", "").Replace(".xml", "") & "#" & legisNo & Environment.NewLine
+
+                            My.Computer.FileSystem.WriteAllText(legisList, strToWrite, True)
+                        End If
+                    Next node
+                Catch ex As Exception
+
+                    If ex.Message.ToString.Contains("Object reference not set to an instance of an object.") Then
+                    Else
+                        arrErrorList.Add(strFilename & "#" & ex.Message.ToString)
+                    End If
+                    Continue For
+                End Try
+            Else '==file in the list is not found in the server directory
+                If My.Computer.FileSystem.FileExists("NotFound.txt") Then
+                    My.Computer.FileSystem.WriteAllText("NotFound.txt", strFilename & Environment.NewLine, False)
+                Else
+                    My.Computer.FileSystem.WriteAllText("NotFound.txt", strFilename & Environment.NewLine, True)
+                End If
+            End If
+        Next
+
+        If arrErrorList.Count > 0 Then
+            ' ===> File.WriteAllLines( errorFile, arrErrorList )
+        End If
+        MsgBox("Finished")
+        Process.Start(legisList)
+    End Sub
+    
+    Private Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
+        Call ExtractReferredLegislationXXX("C:\Users\Diddy\Desktop\MLRA_2013_1_364.xml")
+    End Sub
+End Class
+
+'''''<=====>'''''End Namespace
